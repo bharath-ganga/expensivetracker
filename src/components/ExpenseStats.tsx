@@ -76,7 +76,7 @@ export const ExpenseStats = ({ expenses }: ExpenseStatsProps) => {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']} />
+                  <Tooltip formatter={(value: number) => [`₹${value.toFixed(2)}`, 'Amount']} />
                 </PieChart>
               </ResponsiveContainer>
               
@@ -91,7 +91,7 @@ export const ExpenseStats = ({ expenses }: ExpenseStatsProps) => {
                       <span>{item.name}</span>
                     </div>
                     <div className="text-right">
-                      <div className="font-medium">${item.value.toFixed(2)}</div>
+                      <div className="font-medium">₹{item.value.toFixed(2)}</div>
                       <div className="text-gray-500">{item.count} expense{item.count === 1 ? '' : 's'}</div>
                     </div>
                   </div>
@@ -124,7 +124,7 @@ export const ExpenseStats = ({ expenses }: ExpenseStatsProps) => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value: number) => [`$${value.toFixed(2)}`, 'Amount']} />
+                <Tooltip formatter={(value: number) => [`₹${value.toFixed(2)}`, 'Amount']} />
                 <Bar dataKey="amount" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

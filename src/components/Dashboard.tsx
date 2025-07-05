@@ -66,7 +66,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
             <DollarSign className="h-4 w-4 opacity-90" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalExpenses.toFixed(2)}</div>
+            <div className="text-2xl font-bold">₹{totalExpenses.toFixed(2)}</div>
             <p className="text-xs opacity-80">All time spending</p>
           </CardContent>
         </Card>
@@ -78,7 +78,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${thisMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0).toFixed(2)}
+              ₹{thisMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0).toFixed(2)}
             </div>
             <p className="text-xs opacity-80">{thisMonthExpenses.length} transactions</p>
           </CardContent>
@@ -91,7 +91,7 @@ export const Dashboard = ({ user }: DashboardProps) => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${expenses.length > 0 ? (totalExpenses / expenses.length).toFixed(2) : '0.00'}
+              ₹{expenses.length > 0 ? (totalExpenses / expenses.length).toFixed(2) : '0.00'}
             </div>
             <p className="text-xs opacity-80">Per transaction</p>
           </CardContent>
