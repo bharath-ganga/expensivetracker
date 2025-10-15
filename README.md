@@ -1,32 +1,50 @@
 # 💸 Expensive Tracker
 
-Welcome to **Expensive Tracker** – a modern and elegant application designed to help you manage and track your expenses with ease.
+**Expensive Tracker** is a simple and easy-to-use app to help you track and manage your expenses.
 
-This project is built using cutting-edge web technologies including:
+## Features
 
-- ⚡️ Vite – Fast, modern development tooling
-- 🧠 TypeScript – Type-safe JavaScript
-- ⚛️ React – Component-based UI framework
-- 🎨 Tailwind CSS – Utility-first CSS framework
-- 🧩 shadcn/ui – Accessible, stylish UI components
+* Add, edit, and delete expenses
+* View total spending and expense categories
+* Responsive and clean UI
 
-## 🚀 Getting Started
+## Built With
+
+* **Vite** – Fast development environment
+* **TypeScript** – JavaScript with type safety
+* **React** – Component-based UI
+* **Tailwind CSS** – Utility-first CSS framework
+* **shadcn/ui** – Pre-built UI components
+
+## Getting Started
 
 ### Prerequisites
 
-Ensure you have **Node.js** and **npm** installed. It is recommended to use `nvm` to manage Node versions.
+* Node.js and npm installed (use `nvm` if needed)
 
-### Installation & Development
+### Installation
 
 ```bash
-# 1. Clone the repository
+# Clone the repo
 git clone <YOUR_GIT_URL>
 
-# 2. Navigate to the project folder
+# Go to project folder
 cd expensive-tracker
 
-# 3. Install dependencies
+# Install dependencies
 npm install
 
-# 4. Start the development server
+# Start development server
 npm run dev
+```
+
+### Usage
+
+* Open the app in your browser (usually at https://expensivetracker-intern.onrender.com/)
+* Add your expenses and track your spending
+
+## License
+
+This project is open source and available under the MIT License.
+
+---
