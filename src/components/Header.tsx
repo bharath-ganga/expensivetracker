@@ -1,5 +1,5 @@
 
-import { LogOut, DollarSign } from 'lucide-react';
+import { LogOut, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types/auth';
 
@@ -14,14 +14,14 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-2 rounded-xl">
-              <DollarSign className="h-6 w-6 text-white" />
+            <div className="relative flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20">
+              <Wallet className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                Expense Tracker
+              <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center">
+                Fin<span className="text-emerald-500 font-light">Flow</span>
               </h1>
-              <p className="text-sm text-gray-600">Smart financial management</p>
+              <p className="text-xs text-muted-foreground">Smart financial management</p>
             </div>
           </div>
           

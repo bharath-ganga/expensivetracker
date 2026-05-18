@@ -45,11 +45,14 @@ export const Sidebar = () => {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-64 hidden flex-col glass border-r border-white/10 dark:border-white/5 lg:flex">
       <div className="flex h-20 items-center justify-center border-b border-white/10 dark:border-white/5 px-6">
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-          <div className="bg-gradient-to-br from-primary to-accent p-2 rounded-xl shadow-lg shadow-primary/20">
-            <Wallet className="h-6 w-6 text-white" />
+        <Link to="/" className="flex items-center gap-3 font-black tracking-wide text-2xl hover:opacity-90 transition-opacity">
+          <div className="relative flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20 group">
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 blur-sm opacity-50 group-hover:opacity-100 transition-opacity" />
+            <Wallet className="relative h-5 w-5 text-white" />
           </div>
-          <span className="text-gradient">FinTracker</span>
+          <span className="font-extrabold tracking-tight text-foreground flex items-center">
+            Fin<span className="text-emerald-500 font-light">Flow</span>
+          </span>
         </Link>
       </div>
 

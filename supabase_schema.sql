@@ -1,5 +1,17 @@
 -- Execute these commands in your Supabase SQL Editor
 
+-- 0. Profiles Table
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name TEXT,
+  monthly_salary NUMERIC DEFAULT 0,
+  pay_date INTEGER DEFAULT 1,
+  savings_goal_percent NUMERIC DEFAULT 20,
+  onboarding_complete BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 1. Debts Table
 CREATE TABLE IF NOT EXISTS debts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -63,10 +75,15 @@ ADD COLUMN IF NOT EXISTS mood TEXT,
 ADD COLUMN IF NOT EXISTS notes TEXT;
 
 -- Set up Row Level Security (RLS) for new tables
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE debts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE investments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wishlist ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monthly_reports ENABLE ROW LEVEL SECURITY;
+
+-- Policies for Profiles
+CREATE POLICY "Users can view and update their own profile" 
+ON profiles FOR ALL USING (auth.uid() = id);
 
 -- Policies for Debts
 CREATE POLICY "Users can manage their own debts" 
