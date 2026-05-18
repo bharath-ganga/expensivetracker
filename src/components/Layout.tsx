@@ -14,7 +14,7 @@ export const Layout = () => {
       .from('profiles')
       .select('*')
       .eq('id', sessionUser.id)
-      .single();
+      .maybeSingle();
       
     setUser({
       id: sessionUser.id,
