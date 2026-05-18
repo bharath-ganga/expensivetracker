@@ -115,25 +115,31 @@ ALTER TABLE wishlist ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monthly_reports ENABLE ROW LEVEL SECURITY;
 
 -- 1. Profiles RLS Policies
+DROP POLICY IF EXISTS "Users can manage their own profile" ON profiles;
 CREATE POLICY "Users can manage their own profile" 
 ON profiles FOR ALL USING (auth.uid() = id);
 
 -- 2. Expenses RLS Policies
+DROP POLICY IF EXISTS "Users can manage their own expenses" ON expenses;
 CREATE POLICY "Users can manage their own expenses" 
 ON expenses FOR ALL USING (auth.uid() = user_id);
 
 -- 3. Debts RLS Policies
+DROP POLICY IF EXISTS "Users can manage their own debts" ON debts;
 CREATE POLICY "Users can manage their own debts" 
 ON debts FOR ALL USING (auth.uid() = user_id);
 
 -- 4. Investments RLS Policies
+DROP POLICY IF EXISTS "Users can manage their own investments" ON investments;
 CREATE POLICY "Users can manage their own investments" 
 ON investments FOR ALL USING (auth.uid() = user_id);
 
 -- 5. Wishlist RLS Policies
+DROP POLICY IF EXISTS "Users can manage their own wishlist" ON wishlist;
 CREATE POLICY "Users can manage their own wishlist" 
 ON wishlist FOR ALL USING (auth.uid() = user_id);
 
 -- 6. Monthly Reports RLS Policies
+DROP POLICY IF EXISTS "Users can manage their own monthly reports" ON monthly_reports;
 CREATE POLICY "Users can manage their own monthly reports" 
 ON monthly_reports FOR ALL USING (auth.uid() = user_id);
