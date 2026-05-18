@@ -32,7 +32,7 @@ export const QuickAddWidget = () => {
       user_id: user?.id,
       amount: Number(amount),
       description: 'Quick Add',
-      category: category,
+      category_id: category,
       date: new Date().toISOString()
     });
 

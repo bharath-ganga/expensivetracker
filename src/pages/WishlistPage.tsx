@@ -66,7 +66,7 @@ export const WishlistPage = () => {
       user_id: user.id,
       amount: item.estimated_price,
       description: item.item_name,
-      category: 'Shopping', // Default
+      category_id: 'Shopping', // Default
       date: new Date().toISOString().split('T')[0],
       currency: 'INR'
     }]);
