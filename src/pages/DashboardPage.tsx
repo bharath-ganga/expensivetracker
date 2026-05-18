@@ -8,6 +8,8 @@ import {
 } from 'recharts';
 import { ArrowDownIcon, ArrowUpIcon, CreditCard, DollarSign, Wallet, Brain, HeartPulse, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { GreetingClock } from '@/components/GreetingClock';
+import { MonthlyReportModal } from '@/components/MonthlyReportModal';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#ec4899', '#f59e0b', '#10b981'];
 
@@ -136,9 +138,9 @@ export const DashboardPage = () => {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Good morning, {user?.name?.split(' ')[0] || 'User'} 👋</p>
+          <GreetingClock name={user?.name?.split(' ')[0] || 'User'} />
         </div>
+        <MonthlyReportModal />
       </div>
 
       {!user?.monthly_salary && (

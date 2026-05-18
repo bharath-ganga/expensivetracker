@@ -6,7 +6,14 @@ import {
   BarChart3, 
   Settings, 
   LogOut,
-  Plus
+  Plus,
+  Calendar,
+  CreditCard,
+  TrendingUp,
+  ShoppingBag,
+  Target,
+  Bell,
+  Users
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
@@ -20,6 +27,13 @@ export const Sidebar = () => {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Transactions', path: '/transactions', icon: Receipt },
     { name: 'Budgets', path: '/budgets', icon: Wallet },
+    { name: 'Calendar', path: '/calendar', icon: Calendar },
+    { name: 'Debts', path: '/debts', icon: CreditCard },
+    { name: 'Investments', path: '/investments', icon: TrendingUp },
+    { name: 'Wishlist', path: '/wishlist', icon: ShoppingBag },
+    { name: 'Goals', path: '/goals', icon: Target },
+    { name: 'Reminders', path: '/reminders', icon: Bell },
+    { name: 'Split Expense', path: '/split', icon: Users },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];

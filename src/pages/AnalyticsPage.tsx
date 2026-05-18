@@ -74,30 +74,79 @@ export const AnalyticsPage = () => {
           </CardContent>
         </Card>
 
-        <Card className="glass">
-          <CardHeader>
-            <CardTitle>Top Categories</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {[
-              { name: 'Food', amount: 450, percent: 45, color: 'bg-primary' },
-              { name: 'Transport', amount: 200, percent: 20, color: 'bg-blue-500' },
-              { name: 'Shopping', amount: 150, percent: 15, color: 'bg-pink-500' },
-              { name: 'Bills', amount: 100, percent: 10, color: 'bg-orange-500' },
-              { name: 'Other', amount: 100, percent: 10, color: 'bg-muted' },
-            ].map((cat) => (
-              <div key={cat.name} className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">{cat.name}</span>
-                  <span className="text-muted-foreground">₹{cat.amount}</span>
+        <div className="space-y-6 flex flex-col">
+          <Card className="glass flex-1">
+            <CardHeader>
+              <CardTitle>Top Categories</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {[
+                { name: 'Food', amount: 450, percent: 45, color: 'bg-primary' },
+                { name: 'Transport', amount: 200, percent: 20, color: 'bg-blue-500' },
+                { name: 'Shopping', amount: 150, percent: 15, color: 'bg-pink-500' },
+                { name: 'Bills', amount: 100, percent: 10, color: 'bg-orange-500' },
+                { name: 'Other', amount: 100, percent: 10, color: 'bg-muted' },
+              ].map((cat) => (
+                <div key={cat.name} className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{cat.name}</span>
+                    <span className="text-muted-foreground">₹{cat.amount}</span>
+                  </div>
+                  <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                    <div className={`h-full ${cat.color}`} style={{ width: `${cat.percent}%` }} />
+                  </div>
                 </div>
-                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                  <div className={`h-full ${cat.color}`} style={{ width: `${cat.percent}%` }} />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Mood Insights */}
+          <Card className="glass border-primary/20 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                😊 Emotional Spending
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const moodData = expenses.filter(e => e.mood).reduce((acc: any, e) => {
+                  if (!acc[e.mood]) acc[e.mood] = { count: 0, total: 0 };
+                  acc[e.mood].count += 1;
+                  acc[e.mood].total += e.amount;
+                  return acc;
+                }, {});
+
+                if (Object.keys(moodData).length === 0) {
+                  return <p className="text-sm text-muted-foreground">Log expenses with your mood to see insights here.</p>;
+                }
+
+                const mostFrequent = Object.entries(moodData).sort((a: any, b: any) => b[1].count - a[1].count)[0];
+                const highestAvg = Object.entries(moodData).sort((a: any, b: any) => (b[1].total / b[1].count) - (a[1].total / a[1].count))[0];
+                
+                const emojiMap: Record<string, string> = {
+                  happy: '😊 Happy',
+                  neutral: '😐 Neutral',
+                  guilty: '😟 Guilty',
+                  excited: '🤩 Excited',
+                  stressed: '😤 Stressed'
+                };
+
+                return (
+                  <div className="space-y-4">
+                    <div className="bg-background/50 p-3 rounded-lg border border-white/5">
+                      <p className="text-xs text-muted-foreground mb-1">Your mood when spending most often:</p>
+                      <p className="font-bold">{emojiMap[mostFrequent[0]]}</p>
+                    </div>
+                    <div className="bg-background/50 p-3 rounded-lg border border-white/5">
+                      <p className="text-xs text-muted-foreground mb-1">You spend the most (avg) when:</p>
+                      <p className="font-bold text-red-400">{emojiMap[highestAvg[0]]} — avg ₹{(highestAvg[1] as any).total / (highestAvg[1] as any).count}/session</p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

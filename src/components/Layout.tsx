@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
 import { Sidebar } from './Sidebar';
+import { QuickAddWidget } from './QuickAddWidget';
 
 export const Layout = () => {
   const { user, setUser } = useStore();
@@ -71,6 +72,7 @@ export const Layout = () => {
           <Outlet />
         </main>
       </div>
+      <QuickAddWidget />
     </div>
   );
 };

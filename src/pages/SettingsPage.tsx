@@ -4,11 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStore } from '@/store/useStore';
-import { Download, User as UserIcon, Bell, Shield } from 'lucide-react';
+import { useTheme } from '@/components/ThemeProvider';
+import { Download, User as UserIcon, Bell, Shield, Palette } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const SettingsPage = () => {
   const { user, expenses, currency, setCurrency } = useStore();
+  const { theme, setTheme } = useTheme();
 
   const handleExportCSV = () => {
     if (expenses.length === 0) {
@@ -78,6 +80,21 @@ export const SettingsPage = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <Label className="flex items-center gap-2"><Palette className="h-4 w-4" /> App Theme</Label>
+              <Select value={theme} onValueChange={(v: any) => setTheme(v)}>
+                <SelectTrigger className="bg-background/50 border-white/10">
+                  <SelectValue placeholder="Select Theme" />
+                </SelectTrigger>
+                <SelectContent className="glass border-white/10">
+                  <SelectItem value="light">☀️ Light Mode</SelectItem>
+                  <SelectItem value="dark">🌙 Dark Mode</SelectItem>
+                  <SelectItem value="amoled">⚫ AMOLED Mode (Pure Black)</SelectItem>
+                  <SelectItem value="system">💻 System Default</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-white/10">
               <Label>Default Currency</Label>
               <Select value={currency} onValueChange={setCurrency}>
                 <SelectTrigger className="bg-background/50 border-white/10">

@@ -12,6 +12,13 @@ import { TransactionsPage } from "@/pages/TransactionsPage";
 import { BudgetsPage } from "@/pages/BudgetsPage";
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { CalendarPage } from "@/pages/CalendarPage";
+import { DebtsPage } from "@/pages/DebtsPage";
+import { InvestmentsPage } from "@/pages/InvestmentsPage";
+import { WishlistPage } from "@/pages/WishlistPage";
+import { GoalsPage } from "@/pages/GoalsPage";
+import { RemindersPage } from "@/pages/RemindersPage";
+import { SplitExpensesPage } from "@/pages/SplitExpensesPage";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +38,13 @@ const App = () => (
               <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/budgets" element={<BudgetsPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/debts" element={<DebtsPage />} />
+              <Route path="/investments" element={<InvestmentsPage />} />
+              <Route path="/wishlist" element={<WishlistPage />} />
+              <Route path="/goals" element={<GoalsPage />} />
+              <Route path="/reminders" element={<RemindersPage />} />
+              <Route path="/split" element={<SplitExpensesPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
