@@ -32,6 +32,8 @@ export interface Expense {
   recurring_interval?: 'daily' | 'weekly' | 'monthly';
   tags: string[];
   created_at: string;
+  mood?: string;
+  notes?: string;
   
   // Joined relation for UI
   categories?: Category;

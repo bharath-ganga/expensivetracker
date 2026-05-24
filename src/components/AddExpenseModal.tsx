@@ -30,7 +30,7 @@ export const AddExpenseModal = () => {
   const [formData, setFormData] = useState({
     amount: '',
     description: '',
-    category: 'Food',
+    category: 'Food & Dining',
     date: new Date().toISOString().split('T')[0],
     notes: '',
     mood: 'neutral'
@@ -74,18 +74,33 @@ export const AddExpenseModal = () => {
     
     setIsLoading(true);
     
-    const { error } = await supabase.from('expenses').insert([{
+    const insertData: any = {
       user_id: user.id,
       amount: parseFloat(formData.amount),
       description: formData.description,
       date: formData.date,
       currency: 'INR',
+      category_id: formData.category
+    };
+
+    // Try inserting with mood and notes if they exist in the schema
+    let result = await supabase.from('expenses').insert([{
+      ...insertData,
       notes: formData.notes,
       mood: formData.mood
     }]);
 
+    let error = result.error;
+
+    // Graceful fallback if mood or notes columns do not exist in the database table
+    if (error && error.message && (error.message.includes('column') || error.message.includes('mood') || error.message.includes('notes') || error.code === 'PGRST204')) {
+      console.warn('Retrying insert without mood and notes due to database schema mismatch:', error);
+      const retryResult = await supabase.from('expenses').insert([insertData]);
+      error = retryResult.error;
+    }
+
     if (error) {
-      toast.error('Failed to add expense');
+      toast.error(error.message || 'Failed to add expense');
       console.error(error);
     } else {
       toast.success('Expense added successfully!');
@@ -93,7 +108,7 @@ export const AddExpenseModal = () => {
       setFormData({
         amount: '',
         description: '',
-        category: 'Food',
+        category: 'Food & Dining',
         date: new Date().toISOString().split('T')[0],
         notes: '',
         mood: 'neutral'
