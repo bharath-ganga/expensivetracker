@@ -1,8 +1,9 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Layout } from "@/components/Layout";
 import { AuthPage } from "@/pages/AuthPage";
@@ -21,8 +22,29 @@ import { GoalsPage } from "@/pages/GoalsPage";
 import { RemindersPage } from "@/pages/RemindersPage";
 import { SplitExpensesPage } from "@/pages/SplitExpensesPage";
 import NotFound from "@/pages/NotFound";
+import { hasInitialPasswordRecoveryUrl, supabase } from "@/lib/supabase";
 
 const queryClient = new QueryClient();
+
+const PasswordRecoveryRedirect = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (hasInitialPasswordRecoveryUrl) {
+      navigate('/auth/update-password', { replace: true });
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
+      if (event === 'PASSWORD_RECOVERY') {
+        navigate('/auth/update-password', { replace: true });
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  return null;
+};
 
 const App = () => (
   <ThemeProvider defaultTheme="light" storageKey="fintracker-theme">
@@ -31,6 +53,7 @@ const App = () => (
         <Toaster />
         <Sonner theme="system" />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <PasswordRecoveryRedirect />
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/auth/update-password" element={<UpdatePasswordPage />} />

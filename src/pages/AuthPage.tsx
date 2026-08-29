@@ -102,10 +102,10 @@ export const AuthPage = () => {
     }
     setIsLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/update-password`,
+      redirectTo: new URL('/auth/update-password', window.location.origin).toString(),
     });
     if (error) toast.error(error.message);
-    else toast.success("Password reset email sent!");
+    else toast.success("If an account exists for that email, a password reset link has been sent.");
     setIsLoading(false);
   };
 

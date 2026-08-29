@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { KeyRound, Loader2 } from 'lucide-react';
+import { AlertCircle, KeyRound, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -8,15 +8,93 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+type RecoveryState = 'loading' | 'ready' | 'invalid';
+
 export const UpdatePasswordPage = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [recoveryState, setRecoveryState] = useState<RecoveryState>('loading');
+  const [recoveryError, setRecoveryError] = useState('');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setHasSession(Boolean(data.session)));
+    let mounted = true;
+    let resolved = false;
+    let fallbackTimer: number | undefined;
+
+    const url = new URL(window.location.href);
+    const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+    const urlError = url.searchParams.get('error_description') || hashParams.get('error_description');
+    const hasRecoveryPayload = url.searchParams.has('code')
+      || hashParams.has('access_token')
+      || hashParams.get('type') === 'recovery';
+
+    const cleanRecoveryUrl = () => {
+      const cleanUrl = new URL(window.location.href);
+      ['code', 'error', 'error_code', 'error_description', 'type'].forEach(param => cleanUrl.searchParams.delete(param));
+      cleanUrl.hash = '';
+      window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}`);
+    };
+
+    const markReady = () => {
+      if (!mounted) return;
+      resolved = true;
+      setRecoveryError('');
+      setRecoveryState('ready');
+      cleanRecoveryUrl();
+    };
+
+    const markInvalid = (message?: string) => {
+      if (!mounted || resolved) return;
+      resolved = true;
+      setRecoveryError(message || 'This recovery link is invalid or has expired.');
+      setRecoveryState('invalid');
+      cleanRecoveryUrl();
+    };
+
+    if (urlError) {
+      markInvalid(urlError);
+      return;
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+
+      if (event === 'PASSWORD_RECOVERY' || session) {
+        markReady();
+      } else if (event === 'INITIAL_SESSION' && !hasRecoveryPayload) {
+        markInvalid();
+      }
+    });
+
+    void supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted || resolved) return;
+
+      if (data.session) {
+        markReady();
+        return;
+      }
+
+      if (error) {
+        markInvalid(error.message);
+        return;
+      }
+
+      // URL token detection can finish just after the first session read.
+      fallbackTimer = window.setTimeout(async () => {
+        const { data: retryData, error: retryError } = await supabase.auth.getSession();
+        if (!mounted || resolved) return;
+        if (retryData.session) markReady();
+        else markInvalid(retryError?.message);
+      }, 1500);
+    });
+
+    return () => {
+      mounted = false;
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -32,18 +110,19 @@ export const UpdatePasswordPage = () => {
 
     setIsLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
-    setIsLoading(false);
 
     if (error) {
+      setIsLoading(false);
       toast.error(error.message);
       return;
     }
 
-    toast.success('Password updated successfully.');
-    navigate('/', { replace: true });
+    await supabase.auth.signOut();
+    toast.success('Password updated successfully. Sign in with your new password.');
+    navigate('/auth', { replace: true });
   };
 
-  if (hasSession === null) {
+  if (recoveryState === 'loading') {
     return <div className="min-h-screen grid place-items-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
@@ -56,26 +135,34 @@ export const UpdatePasswordPage = () => {
           </div>
           <CardTitle>Set a new password</CardTitle>
           <CardDescription>
-            {hasSession ? 'Choose a secure password for your account.' : 'This recovery link is invalid or has expired. Request a new one from the sign-in page.'}
+            {recoveryState === 'ready'
+              ? 'Choose a secure password for your account.'
+              : 'This recovery link cannot be used. Request a new one from the sign-in page.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {hasSession ? (
+          {recoveryState === 'ready' ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="new-password">New password</Label>
-                <Input id="new-password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+                <Input id="new-password" type="password" minLength={8} autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-new-password">Confirm password</Label>
-                <Input id="confirm-new-password" type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required />
+                <Input id="confirm-new-password" type="password" minLength={8} autoComplete="new-password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} required />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update password'}
               </Button>
             </form>
           ) : (
-            <Button className="w-full" onClick={() => navigate('/auth', { replace: true })}>Back to sign in</Button>
+            <div className="space-y-4">
+              <div className="flex gap-3 border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>{recoveryError || 'The link may have expired or already been used.'}</p>
+              </div>
+              <Button className="w-full" onClick={() => navigate('/auth', { replace: true })}>Request another reset link</Button>
+            </div>
           )}
         </CardContent>
       </Card>
