@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Layout } from "@/components/Layout";
 import { AuthPage } from "@/pages/AuthPage";
+import { UpdatePasswordPage } from "@/pages/UpdatePasswordPage";
 import { OnboardingPage } from "@/pages/OnboardingPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { TransactionsPage } from "@/pages/TransactionsPage";
@@ -29,9 +30,10 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner theme="system" />
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/auth/update-password" element={<UpdatePasswordPage />} />
             
             <Route element={<Layout />}>
               <Route path="/" element={<DashboardPage />} />

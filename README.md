@@ -1,83 +1,91 @@
-# 💸 FinFlow: Premium Personal Finance Manager
+# FinFlow
 
-**FinFlow** is a modern, responsive, and feature-rich personal finance tracking and management application built using React, TypeScript, Tailwind CSS, and Supabase. It empowers users to monitor transactions, budget smartly, manage debts, track investments, plan wishlists, and analyze their spending habits with premium interactive charts and calendar views.
+FinFlow is a responsive personal finance manager for tracking day-to-day spending and planning longer-term financial goals. It combines a React and TypeScript interface with Supabase authentication, storage, and a row-level-secured PostgreSQL database.
 
----
+## Features
 
-## 🚀 Key Features
+- Dashboard with balances, cash-flow summaries, recent activity, budget progress, and monthly reports
+- Income and expense tracking with categories, tags, recurring schedules, moods, and receipt uploads
+- Monthly category budgets and spending analytics
+- Calendar view for transactions and scheduled financial activity
+- Savings goals with contribution history and progress tracking
+- Bill reminders with recurring schedules and payment status
+- Shared-expense splitting with participant settlement tracking
+- Debt and IOU management, including partial payments and due dates
+- Investment portfolio tracking for stocks, crypto, mutual funds, gold, and other assets
+- Prioritized wishlist with prices, links, target dates, and purchase status
+- Profile, currency, theme, and data-export settings
+- Responsive desktop and mobile navigation
 
-- **🔐 Supabase Authentication & Onboarding**: Seamless sign-up/login with personalized onboarding to capture monthly salary, pay date, and monthly savings goals.
-- **📊 Premium Dashboard**: High-level dashboard showcasing overall balance, monthly salary, savings rate, recent transactions, category budgets, and income vs. expense progress.
-- **💵 Smart Transaction Management**: Easily add, edit, and filter expenses and incomes, tag transactions, log mood, upload receipt URLs, and configure recurring schedules.
-- **🎯 Category Budgeting**: Set custom monthly budgets for specific categories (e.g., Food, Travel, Entertainment) and track real-time consumption with interactive progress bars.
-- **📅 Finance Calendar View**: Visual calendar showcasing transactions, bills, and due dates directly on their scheduled dates.
-- **🤝 Debt & IOUs Ledger**: Keep track of borrowing and lending. Monitor who owes you or who you owe, track partial payments, due dates, and update statuses.
-- **📈 Portfolio & Investments Tracker**: Log your stock, cryptocurrency, mutual fund, and gold portfolios with automated tracking of total invested amounts vs. current values.
-- **✨ Wishlist Board (Buy Later)**: Prioritized list of desired purchases with target dates, links, prices, and status toggles.
-- **⚙️ Settings & Customization**: Manage user profile details, toggle system themes (Light/Dark mode), and export financial data to JSON or CSV formats.
+## Tech stack
 
----
+- React 18, TypeScript, and Vite
+- Tailwind CSS and shadcn/ui
+- Supabase Auth, PostgreSQL, Storage, and Row Level Security
+- TanStack Query and Zustand
+- Recharts
+- Vitest and ESLint
 
-## 🛠️ Built With
+## Getting started
 
-- **Vite** – Fast development environment & build tool
-- **React 18** & **TypeScript** – Component-based UI with strong static typing
-- **Tailwind CSS** & **shadcn/ui** – A fully premium, responsive design system
-- **Recharts** – Interactive and responsive charts for visual analytics
-- **Zustand** – Light-weight state management
-- **Supabase** – Backend-as-a-service providing user authentication and real-time database storage
+### Prerequisites
 
----
+- Node.js 18 or newer
+- npm
+- A Supabase project
 
-## 📦 Database Schema Setup
+### Install and run
 
-If you are setting up your own Supabase instance, execute the comprehensive SQL script found in `supabase_schema.sql` via the Supabase SQL Editor. It configures the following:
+```bash
+git clone https://github.com/bharath-ganga/expensivetracker.git
+cd expensivetracker
+npm install
+Copy-Item .env.example .env
+npm run dev
+```
 
-- `profiles` table (salary, pay date, goals, onboarding)
-- `expenses` table (amount, categories, description, date, recurring options)
-- `debts` table (persons, type, borrow/due dates, paid/remaining amounts)
-- `investments` table (portfolio name, type, invested amount, current value)
-- `wishlist` table (priority, link, price, target dates)
-- `monthly_reports` table (calculated budget scores, top category tracker)
-- Complete **Row Level Security (RLS)** policies to ensure users can only access their own data.
+On macOS or Linux, replace the PowerShell copy command with:
 
----
+```bash
+cp .env.example .env
+```
 
-## ⚙️ Getting Started
+Set these values in `.env`:
 
-### 📋 Prerequisites
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
 
-- **Node.js** (v18 or higher recommended)
-- **npm** or **bun** / **yarn**
+Vite prints the local development URL after startup.
 
-### 💻 Installation
+## Supabase setup
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/bharath-ganga/expensivetracker.git
-   cd expensivetracker
-   ```
+Run the SQL files in the Supabase SQL Editor in this order:
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+1. `supabase/migrations/202608290001_finflow_foundation.sql`
+2. `supabase/migrations/202608290002_legacy_expense_compatibility.sql`
 
-3. **Configure Environment Variables:**
-   Create a `.env` file in the root directory (using `.env.example` if available) and add your Supabase credentials:
-   ```env
-   VITE_SUPABASE_URL=your-supabase-project-url
-   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-   ```
+The foundation migration is idempotent and supports both fresh projects and upgrades without deleting existing financial records. It creates the application tables, database functions, receipt-storage bucket, and Row Level Security policies that isolate each user's data. The compatibility migration upgrades older expense schemas.
 
-4. **Start the local development server:**
-   ```bash
-   npm run dev
-   ```
-   Open your browser and navigate to the local address (typically `http://localhost:8080` or `http://localhost:5173`).
+`supabase_schema.sql` remains available as a legacy consolidated schema reference. New installations should use the versioned migrations above.
 
----
+## Available scripts
 
-## 📄 License
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite development server |
+| `npm run build` | Create a production build |
+| `npm run preview` | Preview the production build |
+| `npm run typecheck` | Run TypeScript validation |
+| `npm run lint` | Run ESLint |
+| `npm test` | Run the Vitest suite |
+| `npm run check` | Run type-checking, linting, tests, and a production build |
 
-This project is open-source and licensed under the [MIT License](LICENSE).
+For the manual end-to-end checklist, see [`docs/TESTING.md`](docs/TESTING.md).
+
+## Security notes
+
+- Never commit `.env` or service-role credentials.
+- The browser app should use only the Supabase anonymous key.
+- Apply the included Row Level Security policies before using real financial data.

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,16 +6,31 @@ import { useStore } from '@/store/useStore';
 import { Link } from 'react-router-dom';
 import { Brain, Edit2, CheckCircle2, AlertTriangle, XCircle, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
+import { getPayCycleBounds, isDateInRange } from '@/lib/finance-calculations';
+import type { CategoryBudget } from '@/types/database';
 
 export const BudgetsPage = () => {
   const { user, expenses } = useStore();
   const [editingCat, setEditingCat] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState<string>('');
+  const [savedLimits, setSavedLimits] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('category_budgets').select('*').eq('user_id', user.id).then(({ data, error }) => {
+      if (error) {
+        toast.error(`Unable to load budgets: ${error.message}`);
+        return;
+      }
+      setSavedLimits(Object.fromEntries(((data || []) as CategoryBudget[]).map(item => [item.category_name, item.monthly_limit])));
+    });
+  }, [user]);
 
   if (!user?.monthly_salary) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in duration-500">
-        <div className="bg-primary/10 p-6 rounded-full">
+        <div className="border-2 border-foreground bg-primary p-6 shadow-[4px_4px_0_hsl(var(--foreground))]">
           <Brain className="h-16 w-16 text-primary" />
         </div>
         <h2 className="text-2xl font-bold">Smart Budget Planner is locked</h2>
@@ -43,13 +58,11 @@ export const BudgetsPage = () => {
 
   // Calculate stats
   const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const currentDay = now.getDate();
-  const daysLeft = Math.max(1, daysInMonth - currentDay);
+  const cycle = getPayCycleBounds(now, user.pay_date || 1);
+  const daysLeft = cycle.daysRemaining;
   
   const currentMonthExpenses = expenses.filter(e => {
-    const d = new Date(e.date);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    return isDateInRange(e.date, cycle.start, cycle.end);
   });
 
   const totalSpent = currentMonthExpenses.reduce((acc, curr) => acc + curr.amount, 0);
@@ -57,7 +70,7 @@ export const BudgetsPage = () => {
   const dailyBudget = remainingBudget / daysLeft;
   const savedSoFar = Math.max(0, salary - totalSpent);
   const pacePercentage = (totalSpent / salary) * 100;
-  const monthPercentage = (currentDay / daysInMonth) * 100;
+  const monthPercentage = (cycle.elapsedDays / cycle.totalDays) * 100;
 
   // Aggregate category spending
   const catSpent: Record<string, number> = {};
@@ -66,18 +79,31 @@ export const BudgetsPage = () => {
     catSpent[cat] = (catSpent[cat] || 0) + e.amount;
   });
 
-  // Mock category limits (In a real app, these would come from the database `budget_plan` jsonb)
   const categoryLimits = [
-    { name: 'Food & Dining', icon: '🍔', limit: 8000, spent: catSpent['Food & Dining'] || catSpent['Food'] || 0 },
-    { name: 'Transport', icon: '🚗', limit: 3000, spent: catSpent['Transport'] || 0 },
-    { name: 'Entertainment', icon: '🎬', limit: 2500, spent: catSpent['Entertainment'] || 0 },
-    { name: 'Shopping', icon: '🛍️', limit: 4000, spent: catSpent['Shopping'] || 0 },
-    { name: 'Bills & Utilities', icon: '📱', limit: 5000, spent: catSpent['Bills & Utilities'] || catSpent['Bills'] || 0 },
+    { name: 'Food & Dining', icon: '🍔', limit: savedLimits['Food & Dining'] ?? 8000, spent: catSpent['Food & Dining'] || catSpent['Food'] || 0 },
+    { name: 'Transport', icon: '🚗', limit: savedLimits.Transport ?? 3000, spent: catSpent['Transport'] || 0 },
+    { name: 'Entertainment', icon: '🎬', limit: savedLimits.Entertainment ?? 2500, spent: catSpent['Entertainment'] || 0 },
+    { name: 'Shopping', icon: '🛍️', limit: savedLimits.Shopping ?? 4000, spent: catSpent['Shopping'] || 0 },
+    { name: 'Bills & Utilities', icon: '📱', limit: savedLimits['Bills & Utilities'] ?? 5000, spent: catSpent['Bills & Utilities'] || catSpent['Bills'] || 0 },
   ];
 
-  const handleSaveLimit = (catName: string) => {
-    // Here you would save to Supabase
-    toast.success(`Updated limit for ${catName} to ₹${editAmount}`);
+  const handleSaveLimit = async (catName: string) => {
+    const monthlyLimit = Number(editAmount);
+    if (!user || !Number.isFinite(monthlyLimit) || monthlyLimit < 0) {
+      toast.error('Enter a valid budget limit.');
+      return;
+    }
+    const { error } = await supabase.from('category_budgets').upsert({
+      user_id: user.id,
+      category_name: catName,
+      monthly_limit: monthlyLimit,
+    }, { onConflict: 'user_id,category_name' });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setSavedLimits(current => ({ ...current, [catName]: monthlyLimit }));
+    toast.success(`Updated limit for ${catName}.`);
     setEditingCat(null);
   };
 
@@ -106,7 +132,7 @@ export const BudgetsPage = () => {
               </div>
             </div>
 
-            <div className="h-6 w-full rounded-full overflow-hidden flex">
+            <div className="flex h-6 w-full overflow-hidden border-2 border-foreground">
               <div className="bg-blue-500 h-full" style={{ width: `${needsPct}%` }} title="Needs" />
               <div className="bg-amber-500 h-full" style={{ width: `${wantsPct}%` }} title="Wants" />
               <div className="bg-emerald-500 h-full" style={{ width: `${savingsPct}%` }} title="Savings" />
@@ -115,7 +141,7 @@ export const BudgetsPage = () => {
             <div className="grid grid-cols-3 gap-4 pt-2">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <div className="h-3 w-3 bg-blue-500" />
                   <span className="font-medium text-sm">Needs ({needsPct}%)</span>
                 </div>
                 <p className="text-lg font-bold">₹{needsAmount.toLocaleString()}</p>
@@ -123,7 +149,7 @@ export const BudgetsPage = () => {
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <div className="h-3 w-3 bg-amber-500" />
                   <span className="font-medium text-sm">Wants ({wantsPct}%)</span>
                 </div>
                 <p className="text-lg font-bold">₹{wantsAmount.toLocaleString()}</p>
@@ -131,7 +157,7 @@ export const BudgetsPage = () => {
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <div className="h-3 w-3 bg-emerald-500" />
                   <span className="font-medium text-sm">Savings ({savingsPct}%)</span>
                 </div>
                 <p className="text-lg font-bold">₹{savingsAmount.toLocaleString()}</p>
@@ -147,19 +173,19 @@ export const BudgetsPage = () => {
             <CardTitle className="text-white">Monthly Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex justify-between border-b border-white/10 pb-2">
+            <div className="flex justify-between border-b border-background/40 pb-2">
               <span className="text-slate-300">💵 Salary</span>
               <span className="font-medium">₹{salary.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between border-b border-white/10 pb-2">
+            <div className="flex justify-between border-b border-background/40 pb-2">
               <span className="text-slate-300">🛒 Total Spent</span>
               <span className="font-medium">₹{totalSpent.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between border-b border-white/10 pb-2">
+            <div className="flex justify-between border-b border-background/40 pb-2">
               <span className="text-slate-300">💰 Saved So Far</span>
               <span className="font-medium text-emerald-400">₹{savedSoFar.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between border-b border-white/10 pb-2">
+            <div className="flex justify-between border-b border-background/40 pb-2">
               <span className="text-slate-300">📊 Days Left</span>
               <span className="font-medium">{daysLeft} days</span>
             </div>
@@ -250,15 +276,15 @@ export const BudgetsPage = () => {
                     <td className="py-4 font-medium">₹{cat.spent.toLocaleString()}</td>
                     <td className="py-4">
                       {isOver ? (
-                        <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-semibold bg-destructive/10 text-destructive">
+                        <span className="inline-flex items-center gap-1.5 border border-destructive bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground">
                           <XCircle className="h-3.5 w-3.5" /> Over
                         </span>
                       ) : isNear ? (
-                        <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600">
+                        <span className="inline-flex items-center gap-1.5 border border-amber-600 bg-amber-500 px-2.5 py-1 text-xs font-semibold text-black">
                           <AlertTriangle className="h-3.5 w-3.5" /> Near Limit
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600">
+                        <span className="inline-flex items-center gap-1.5 border border-primary bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Safe
                         </span>
                       )}

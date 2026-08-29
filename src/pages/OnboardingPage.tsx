@@ -62,8 +62,8 @@ export const OnboardingPage = () => {
   const calculatedSavings = salary ? (Number(salary) * (savingsGoal[0] / 100)) : 0;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
-      <Card className="w-full max-w-lg shadow-xl border-slate-200 rounded-2xl overflow-hidden">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-lg overflow-hidden border-2 border-foreground shadow-[8px_8px_0_hsl(var(--foreground))]">
         <CardHeader className="text-center pb-6 pt-10">
           <CardTitle className="text-3xl font-bold tracking-tight text-slate-900">
             👋 Welcome, {user?.name?.split(' ')[0] || 'Friend'}!
@@ -123,7 +123,7 @@ export const OnboardingPage = () => {
                 step={1} 
                 className="py-4"
               />
-              <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
+              <div className="border-2 border-primary bg-primary p-4 text-primary-foreground">
                 <p className="text-sm font-medium text-slate-700 text-center">
                   You plan to save <span className="text-primary font-bold text-lg">₹{calculatedSavings.toFixed(0)}</span> per month.
                 </p>

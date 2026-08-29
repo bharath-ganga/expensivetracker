@@ -49,7 +49,7 @@ export const QuickAddWidget = () => {
   return (
     <>
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-72 bg-card rounded-2xl shadow-2xl border border-border p-4 animate-in slide-in-from-bottom-5 fade-in z-50">
+        <div className="fixed bottom-24 right-6 w-72 bg-card shadow-[6px_6px_0_hsl(var(--foreground))] border border-border p-4 animate-in slide-in-from-bottom-5 fade-in z-50">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold">Quick Add ⚡</h3>
             <button onClick={() => setIsOpen(false)} className="text-muted-foreground hover:text-foreground">
@@ -75,7 +75,7 @@ export const QuickAddWidget = () => {
                 <button
                   key={cat.name}
                   onClick={() => setCategory(cat.name)}
-                  className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${category === cat.name ? 'bg-primary text-primary-foreground scale-105' : 'bg-muted hover:bg-muted/80'}`}
+                  className={`flex flex-col items-center justify-center border p-2 transition-colors ${category === cat.name ? 'border-foreground bg-primary text-primary-foreground' : 'border-border bg-muted hover:bg-secondary'}`}
                 >
                   <cat.icon className="h-5 w-5 mb-1" />
                   <span className="text-[10px] font-medium">{cat.name}</span>
@@ -96,7 +96,7 @@ export const QuickAddWidget = () => {
 
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 h-14 w-14 bg-primary text-primary-foreground rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform z-50"
+        className="fixed bottom-6 right-6 h-14 w-14 bg-primary text-primary-foreground border-2 border-foreground shadow-[4px_4px_0_hsl(var(--foreground))] flex items-center justify-center hover:-translate-y-0.5 transition-transform z-50"
       >
         <Plus className={`h-6 w-6 transition-transform ${isOpen ? 'rotate-45' : ''}`} />
       </button>

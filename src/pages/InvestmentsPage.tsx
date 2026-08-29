@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,15 +8,17 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
 import { toast } from 'sonner';
-import { TrendingUp, Plus, TrendingDown } from 'lucide-react';
+import { TrendingUp, Plus, TrendingDown, Edit3, Trash2 } from 'lucide-react';
+import type { Investment } from '@/types/database';
 
 const COLORS = ['#8b5cf6', '#06b6d4', '#ec4899', '#f59e0b', '#10b981'];
 
 export const InvestmentsPage = () => {
   const { user } = useStore();
-  const [investments, setInvestments] = useState<any[]>([]);
+  const [investments, setInvestments] = useState<Investment[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [editing, setEditing] = useState<Investment | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -26,37 +28,53 @@ export const InvestmentsPage = () => {
     start_date: new Date().toISOString().split('T')[0],
   });
 
-  const fetchInvestments = async () => {
+  const fetchInvestments = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase.from('investments').select('*').eq('user_id', user.id);
-    if (data) setInvestments(data);
-  };
+    const { data, error } = await supabase.from('investments').select('*').eq('user_id', user.id).order('start_date', { ascending: false });
+    if (error) toast.error(error.message); else setInvestments((data || []) as Investment[]);
+  }, [user]);
 
   useEffect(() => {
     fetchInvestments();
-  }, [user]);
+  }, [fetchInvestments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setIsLoading(true);
 
-    const { error } = await supabase.from('investments').insert([{
+    const payload = {
       user_id: user.id,
       name: formData.name,
       type: formData.type,
       amount_invested: parseFloat(formData.amount_invested),
       current_value: parseFloat(formData.current_value),
       start_date: formData.start_date,
-    }]);
+    };
+    const { error } = editing
+      ? await supabase.from('investments').update(payload).eq('id', editing.id).eq('user_id', user.id)
+      : await supabase.from('investments').insert(payload);
 
     if (error) toast.error('Failed to add investment');
     else {
-      toast.success('Investment added!');
+      toast.success(editing ? 'Investment updated.' : 'Investment added!');
       setIsOpen(false);
-      fetchInvestments();
+      setEditing(null);
+      void fetchInvestments();
     }
     setIsLoading(false);
+  };
+
+  const openEdit = (investment: Investment) => {
+    setEditing(investment);
+    setFormData({ name: investment.name, type: investment.type, amount_invested: String(investment.amount_invested), current_value: String(investment.current_value), start_date: investment.start_date });
+    setIsOpen(true);
+  };
+
+  const deleteInvestment = async (investment: Investment) => {
+    if (!window.confirm(`Delete ${investment.name}?`)) return;
+    const { error } = await supabase.from('investments').delete().eq('id', investment.id).eq('user_id', user?.id);
+    if (error) toast.error(error.message); else void fetchInvestments();
   };
 
   const totalInvested = investments.reduce((sum, inv) => sum + inv.amount_invested, 0);
@@ -64,7 +82,7 @@ export const InvestmentsPage = () => {
   const totalProfitLoss = totalCurrent - totalInvested;
   const profitLossPercent = totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : 0;
 
-  const pieData = investments.reduce((acc: any[], inv) => {
+  const pieData = investments.reduce<{ name: string; value: number }[]>((acc, inv) => {
     const existing = acc.find(a => a.name === inv.type);
     if (existing) existing.value += inv.current_value;
     else acc.push({ name: inv.type, value: inv.current_value });
@@ -81,36 +99,36 @@ export const InvestmentsPage = () => {
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-primary text-primary-foreground">
+            <Button className="gap-2 bg-primary text-primary-foreground" onClick={() => { setEditing(null); setFormData({ name: '', type: 'Mutual Fund', amount_invested: '', current_value: '', start_date: new Date().toISOString().split('T')[0] }); }}>
               <Plus className="h-4 w-4" /> Add Investment
             </Button>
           </DialogTrigger>
           <DialogContent className="glass">
             <DialogHeader>
-              <DialogTitle>New Investment</DialogTitle>
+              <DialogTitle>{editing ? 'Edit Investment' : 'New Investment'}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Asset Name</Label>
-                <Input required className="bg-background/50" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. Nifty 50 Index Fund" />
+                <Input required className="border-2 border-input bg-background" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. Nifty 50 Index Fund" />
               </div>
               <div className="space-y-2">
                 <Label>Type</Label>
-                <Input required className="bg-background/50" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} placeholder="e.g. Mutual Fund, Stock, Gold" />
+                <Input required className="border-2 border-input bg-background" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} placeholder="e.g. Mutual Fund, Stock, Gold" />
               </div>
               <div className="space-y-2">
                 <Label>Amount Invested</Label>
-                <Input type="number" required className="bg-background/50" value={formData.amount_invested} onChange={e => setFormData({...formData, amount_invested: e.target.value})} />
+                <Input type="number" required className="border-2 border-input bg-background" value={formData.amount_invested} onChange={e => setFormData({...formData, amount_invested: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Current Value</Label>
-                <Input type="number" required className="bg-background/50" value={formData.current_value} onChange={e => setFormData({...formData, current_value: e.target.value})} />
+                <Input type="number" required className="border-2 border-input bg-background" value={formData.current_value} onChange={e => setFormData({...formData, current_value: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Input type="date" required className="bg-background/50" value={formData.start_date} onChange={e => setFormData({...formData, start_date: e.target.value})} />
+                <Input type="date" required className="border-2 border-input bg-background" value={formData.start_date} onChange={e => setFormData({...formData, start_date: e.target.value})} />
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Investment'}</Button>
+              <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Saving...' : (editing ? 'Update Investment' : 'Save Investment')}</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -145,17 +163,21 @@ export const InvestmentsPage = () => {
                 const profitPercent = (profit / inv.amount_invested) * 100;
                 const isPositive = profit >= 0;
                 return (
-                  <div key={inv.id} className="p-4 rounded-xl border border-white/10 bg-background/50 flex justify-between items-center">
+                  <div key={inv.id} className="flex items-center justify-between border border-border bg-background p-4">
                     <div>
                       <h4 className="font-semibold text-lg">{inv.name}</h4>
                       <p className="text-xs text-muted-foreground">{inv.type} • Since {new Date(inv.start_date).toLocaleDateString()}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex items-center gap-3">
+                      <div>
                       <p className="font-bold">₹{inv.current_value.toFixed(2)}</p>
                       <p className={`text-sm flex items-center justify-end gap-1 ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
                         {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                         {Math.abs(profit).toFixed(2)} ({Math.abs(profitPercent).toFixed(1)}%)
                       </p>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(inv)}><Edit3 /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteInvestment(inv)}><Trash2 /></Button>
                     </div>
                   </div>
                 );
@@ -201,7 +223,7 @@ export const InvestmentsPage = () => {
               {pieData.map((data, idx) => (
                 <div key={data.name} className="flex justify-between items-center text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></div>
+                    <div className="h-3 w-3" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></div>
                     <span>{data.name}</span>
                   </div>
                   <span className="font-semibold">₹{data.value.toFixed(0)}</span>

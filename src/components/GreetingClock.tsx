@@ -18,8 +18,9 @@ export const GreetingClock = ({ name }: { name: string }) => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight">{greeting}, {name} 👋</h1>
-      <p className="text-muted-foreground">{dateString} • {timeString}</p>
+      <p className="eyebrow text-primary mb-2">// FINANCIAL_CONTROL_CENTER</p>
+      <h1 className="text-3xl md:text-4xl font-extrabold tracking-[-0.04em]">{greeting}, {name}.</h1>
+      <p className="font-mono text-xs text-muted-foreground mt-2 uppercase tracking-wider">{dateString} · {timeString} · SYSTEM ONLINE</p>
     </div>
   );
 };

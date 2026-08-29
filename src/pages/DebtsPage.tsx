@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +8,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
 import { toast } from 'sonner';
-import { CreditCard, Plus, ArrowDownToLine, ArrowUpFromLine, CheckCircle2 } from 'lucide-react';
+import { CreditCard, Plus, ArrowDownToLine, ArrowUpFromLine, CheckCircle2, Banknote, Trash2 } from 'lucide-react';
+import type { Debt } from '@/types/database';
 
 export const DebtsPage = () => {
   const { user } = useStore();
-  const [debts, setDebts] = useState<any[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [paymentDebt, setPaymentDebt] = useState<Debt | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
 
   const [formData, setFormData] = useState({
     person_name: '',
@@ -22,18 +25,18 @@ export const DebtsPage = () => {
     type: 'i_owe',
     borrowed_date: new Date().toISOString().split('T')[0],
     notes: '',
+    due_date: '',
   });
 
-  const fetchDebts = async () => {
+  const fetchDebts = useCallback(async () => {
     if (!user) return;
-    // We mock fetch or create table if not exists, but let's assume it exists
-    const { data } = await supabase.from('debts').select('*').eq('user_id', user.id);
-    if (data) setDebts(data);
-  };
+    const { data, error } = await supabase.from('debts').select('*').eq('user_id', user.id).order('borrowed_date', { ascending: false });
+    if (error) toast.error(error.message); else setDebts((data || []) as Debt[]);
+  }, [user]);
 
   useEffect(() => {
     fetchDebts();
-  }, [user]);
+  }, [fetchDebts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +50,7 @@ export const DebtsPage = () => {
       type: formData.type,
       borrowed_date: formData.borrowed_date,
       notes: formData.notes,
+      due_date: formData.due_date || null,
       status: 'pending',
       paid_amount: 0
     }]);
@@ -61,19 +65,28 @@ export const DebtsPage = () => {
     setIsLoading(false);
   };
 
-  const handleSettle = async (id: string) => {
-    const { error } = await supabase.from('debts').update({ status: 'settled' }).eq('id', id);
-    if (!error) {
-      toast.success('Debt settled!');
-      fetchDebts();
-    }
+  const handlePayment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!paymentDebt) return;
+    const { error } = await supabase.rpc('record_debt_payment', { p_debt_id: paymentDebt.id, p_amount: Number(paymentAmount), p_note: null });
+    if (error) return toast.error(error.message);
+    toast.success('Payment recorded.');
+    setPaymentDebt(null);
+    setPaymentAmount('');
+    void fetchDebts();
+  };
+
+  const handleDelete = async (debt: Debt) => {
+    if (!window.confirm(`Delete the debt record for ${debt.person_name}?`)) return;
+    const { error } = await supabase.from('debts').delete().eq('id', debt.id).eq('user_id', user?.id);
+    if (error) toast.error(error.message); else void fetchDebts();
   };
 
   const iOwe = debts.filter(d => d.type === 'i_owe');
   const owedToMe = debts.filter(d => d.type === 'owed_to_me');
 
-  const totalIOwe = iOwe.filter(d => d.status !== 'settled').reduce((sum, d) => sum + d.amount, 0);
-  const totalOwedToMe = owedToMe.filter(d => d.status !== 'settled').reduce((sum, d) => sum + d.amount, 0);
+  const totalIOwe = iOwe.reduce((sum, d) => sum + Math.max(0, d.amount - d.paid_amount), 0);
+  const totalOwedToMe = owedToMe.reduce((sum, d) => sum + Math.max(0, d.amount - d.paid_amount), 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -97,7 +110,7 @@ export const DebtsPage = () => {
               <div className="space-y-2">
                 <Label>Type</Label>
                 <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v})}>
-                  <SelectTrigger className="bg-background/50">
+                  <SelectTrigger className="border-2 border-input bg-background">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="glass">
@@ -108,16 +121,17 @@ export const DebtsPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Person Name</Label>
-                <Input required className="bg-background/50" value={formData.person_name} onChange={e => setFormData({...formData, person_name: e.target.value})} />
+                <Input required className="border-2 border-input bg-background" value={formData.person_name} onChange={e => setFormData({...formData, person_name: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Amount</Label>
-                <Input type="number" required className="bg-background/50" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                <Input type="number" required className="border-2 border-input bg-background" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Date</Label>
-                <Input type="date" required className="bg-background/50" value={formData.borrowed_date} onChange={e => setFormData({...formData, borrowed_date: e.target.value})} />
+                <Input type="date" required className="border-2 border-input bg-background" value={formData.borrowed_date} onChange={e => setFormData({...formData, borrowed_date: e.target.value})} />
               </div>
+              <div className="space-y-2"><Label>Due Date (Optional)</Label><Input type="date" value={formData.due_date} onChange={e => setFormData({...formData, due_date: e.target.value})} /></div>
               <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Record'}</Button>
             </form>
           </DialogContent>
@@ -135,16 +149,17 @@ export const DebtsPage = () => {
           <CardContent className="space-y-4">
             {iOwe.length === 0 && <p className="text-muted-foreground text-sm">No debts here. Great job!</p>}
             {iOwe.map(debt => (
-              <div key={debt.id} className={`p-4 rounded-xl border border-white/10 flex justify-between items-center ${debt.status === 'settled' ? 'opacity-50' : 'bg-background/50'}`}>
+              <div key={debt.id} className={`flex items-center justify-between border border-border p-4 ${debt.status === 'settled' ? 'bg-secondary opacity-50' : 'bg-background'}`}>
                 <div>
                   <h4 className="font-semibold">{debt.person_name}</h4>
                   <p className="text-xs text-muted-foreground">{new Date(debt.borrowed_date).toLocaleDateString()}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="font-bold text-red-500">₹{debt.amount}</span>
+                  <span className="font-bold text-red-500">₹{Math.max(0, debt.amount - debt.paid_amount).toFixed(2)}</span>
                   {debt.status !== 'settled' && (
-                    <Button variant="outline" size="sm" onClick={() => handleSettle(debt.id)}>Settle</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setPaymentDebt(debt); setPaymentAmount(String(debt.amount - debt.paid_amount)); }}><Banknote /> Payment</Button>
                   )}
+                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(debt)}><Trash2 /></Button>
                   {debt.status === 'settled' && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
                 </div>
               </div>
@@ -162,16 +177,17 @@ export const DebtsPage = () => {
           <CardContent className="space-y-4">
             {owedToMe.length === 0 && <p className="text-muted-foreground text-sm">Nobody owes you money right now.</p>}
             {owedToMe.map(debt => (
-              <div key={debt.id} className={`p-4 rounded-xl border border-white/10 flex justify-between items-center ${debt.status === 'settled' ? 'opacity-50' : 'bg-background/50'}`}>
+              <div key={debt.id} className={`flex items-center justify-between border border-border p-4 ${debt.status === 'settled' ? 'bg-secondary opacity-50' : 'bg-background'}`}>
                 <div>
                   <h4 className="font-semibold">{debt.person_name}</h4>
                   <p className="text-xs text-muted-foreground">{new Date(debt.borrowed_date).toLocaleDateString()}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="font-bold text-emerald-500">₹{debt.amount}</span>
+                  <span className="font-bold text-emerald-500">₹{Math.max(0, debt.amount - debt.paid_amount).toFixed(2)}</span>
                   {debt.status !== 'settled' && (
-                    <Button variant="outline" size="sm" onClick={() => handleSettle(debt.id)}>Settle</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setPaymentDebt(debt); setPaymentAmount(String(debt.amount - debt.paid_amount)); }}><Banknote /> Payment</Button>
                   )}
+                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(debt)}><Trash2 /></Button>
                   {debt.status === 'settled' && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
                 </div>
               </div>
@@ -179,6 +195,7 @@ export const DebtsPage = () => {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={Boolean(paymentDebt)} onOpenChange={open => !open && setPaymentDebt(null)}><DialogContent><DialogHeader><DialogTitle>Record payment · {paymentDebt?.person_name}</DialogTitle></DialogHeader><form onSubmit={handlePayment} className="space-y-4"><div className="space-y-2"><Label htmlFor="debt-payment">Payment amount</Label><Input id="debt-payment" type="number" min="0.01" max={paymentDebt ? paymentDebt.amount - paymentDebt.paid_amount : undefined} step="0.01" value={paymentAmount} onChange={event => setPaymentAmount(event.target.value)} required /></div><Button className="w-full">Record payment</Button></form></DialogContent></Dialog>
     </div>
   );
 };

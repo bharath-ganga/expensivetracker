@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStore } from '@/store/useStore';
-import { supabase } from '@/lib/supabase';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
   PieChart, Pie, Cell 
@@ -14,47 +13,9 @@ import { MonthlyReportModal } from '@/components/MonthlyReportModal';
 const COLORS = ['#8b5cf6', '#06b6d4', '#ec4899', '#f59e0b', '#10b981'];
 
 export const DashboardPage = () => {
-  const { user, expenses, setExpenses } = useStore();
-  const [totalSpent, setTotalSpent] = useState(0);
-  const [lastMonthSpent, setLastMonthSpent] = useState(0);
-  const [biggestExpense, setBiggestExpense] = useState(0);
-  const [lastMonthBiggest, setLastMonthBiggest] = useState(0);
+  const { user, expenses, incomes } = useStore();
 
-  useEffect(() => {
-    if (!user) return;
-
-    // Fetch initial expenses
-    const fetchExpenses = async () => {
-      const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false });
-
-      if (!error && data) {
-        setExpenses(data);
-        calculateMetrics(data);
-      }
-    };
-
-    fetchExpenses();
-
-    // Subscribe to real-time changes
-    const channel = supabase
-      .channel('expenses_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `user_id=eq.${user.id}` }, 
-        (payload) => {
-          fetchExpenses(); // Re-fetch all on change to update charts easily
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, setExpenses]);
-
-  const calculateMetrics = (data: any[]) => {
+  const { totalSpent, lastMonthSpent, biggestExpense, lastMonthBiggest, totalIncome, lastMonthIncome } = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -67,8 +28,10 @@ export const DashboardPage = () => {
     let lastSpent = 0;
     let currentBiggest = 0;
     let lastBiggest = 0;
+    let currentIncome = 0;
+    let previousIncome = 0;
 
-    data.forEach(d => {
+    expenses.forEach(d => {
       const dDate = new Date(d.date);
       if (dDate.getMonth() === currentMonth && dDate.getFullYear() === currentYear) {
         currentSpent += d.amount;
@@ -79,11 +42,21 @@ export const DashboardPage = () => {
       }
     });
 
-    setTotalSpent(currentSpent);
-    setLastMonthSpent(lastSpent);
-    setBiggestExpense(currentBiggest);
-    setLastMonthBiggest(lastBiggest);
-  };
+    incomes.forEach(income => {
+      const incomeDate = new Date(income.date);
+      if (incomeDate.getMonth() === currentMonth && incomeDate.getFullYear() === currentYear) currentIncome += income.amount;
+      if (incomeDate.getMonth() === lastMonth && incomeDate.getFullYear() === lastMonthYear) previousIncome += income.amount;
+    });
+
+    return {
+      totalSpent: currentSpent,
+      lastMonthSpent: lastSpent,
+      biggestExpense: currentBiggest,
+      lastMonthBiggest: lastBiggest,
+      totalIncome: currentIncome,
+      lastMonthIncome: previousIncome,
+    };
+  }, [expenses, incomes]);
 
   const renderTrend = (current: number, previous: number, isExpense: boolean = true) => {
     if (current === 0 && previous === 0) {
@@ -118,8 +91,8 @@ export const DashboardPage = () => {
   };
 
   // Process data for charts
-  const categoryData = expenses.reduce((acc: any, curr) => {
-    const cat = curr.description || 'Other'; 
+  const categoryData = expenses.reduce<Record<string, number>>((acc, curr) => {
+    const cat = curr.category_id || 'Other';
     acc[cat] = (acc[cat] || 0) + curr.amount;
     return acc;
   }, {});
@@ -135,7 +108,7 @@ export const DashboardPage = () => {
   }));
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-[1500px] mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <GreetingClock name={user?.name?.split(' ')[0] || 'User'} />
@@ -145,29 +118,28 @@ export const DashboardPage = () => {
 
       {!user?.monthly_salary && (
         <Link to="/onboarding" className="block">
-          <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-center justify-between hover:bg-primary/15 transition-colors cursor-pointer">
+          <div className="bg-primary border border-foreground p-4 flex items-center justify-between text-primary-foreground hover:-translate-y-0.5 transition-transform cursor-pointer shadow-[4px_4px_0_hsl(var(--foreground))]">
             <div className="flex items-center gap-3">
-              <div className="bg-primary/20 p-2 rounded-lg">
+              <div className="bg-primary-foreground p-2 border border-foreground">
                 <Brain className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-primary">Smart Budget Planner is locked!</h3>
-                <p className="text-sm text-primary/80">💡 Set your salary to unlock Budget Planner</p>
+                <h3 className="font-mono font-bold uppercase">Smart Budget Planner is locked</h3>
+                <p className="text-sm">Set your salary to unlock the budget engine.</p>
               </div>
             </div>
-            <span className="text-primary font-bold">→</span>
+            <span className="font-mono font-bold">-&gt;</span>
           </div>
         </Link>
       )}
 
       {/* KPI Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="glass relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <Card className="glass relative overflow-hidden group border-t-4 border-t-primary">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Spent This Month</CardTitle>
-            <div className="bg-primary/20 p-2 rounded-xl">
-              <DollarSign className="h-4 w-4 text-primary" />
+            <div className="bg-primary p-2 border border-foreground">
+              <DollarSign className="h-4 w-4 text-primary-foreground" />
             </div>
           </CardHeader>
           <CardContent>
@@ -184,12 +156,11 @@ export const DashboardPage = () => {
           const dailyBudget = remainingBudget / daysLeft;
           
           return (
-            <Card className="glass relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Card className="glass relative overflow-hidden group border-t-4 border-t-blue-500">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Daily Budget</CardTitle>
-                <div className="bg-blue-500/20 p-2 rounded-xl">
-                  <Activity className="h-4 w-4 text-blue-500" />
+                <div className="bg-blue-500 p-2 border border-foreground">
+                  <Activity className="h-4 w-4 text-white" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -199,17 +170,16 @@ export const DashboardPage = () => {
             </Card>
           );
         })() : (
-          <Card className="glass relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Card className="glass relative overflow-hidden group border-t-4 border-t-blue-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Income</CardTitle>
-              <div className="bg-blue-500/20 p-2 rounded-xl">
-                <Wallet className="h-4 w-4 text-blue-500" />
+              <div className="bg-blue-500 p-2 border border-foreground">
+                <Wallet className="h-4 w-4 text-white" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">₹0.00</div>
-              {renderTrend(0, 0, false)}
+              <div className="text-3xl font-bold text-foreground">₹{totalIncome.toFixed(2)}</div>
+              {renderTrend(totalIncome, lastMonthIncome, false)}
             </CardContent>
           </Card>
         )}
@@ -219,17 +189,16 @@ export const DashboardPage = () => {
           const currentSavings = Math.max(0, user.monthly_salary - totalSpent);
           const progress = Math.min(100, Math.max(0, (currentSavings / savingsGoal) * 100));
           return (
-            <Card className="glass relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Card className="glass relative overflow-hidden group border-t-4 border-t-emerald-500">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Savings Progress</CardTitle>
-                <div className="bg-emerald-500/20 p-2 rounded-xl">
-                  <Wallet className="h-4 w-4 text-emerald-500" />
+                <div className="bg-emerald-500 p-2 border border-foreground">
+                  <Wallet className="h-4 w-4 text-white" />
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-foreground">₹{currentSavings.toFixed(0)}</div>
-                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden mt-2">
+                <div className="mt-2 h-2 w-full overflow-hidden border border-border bg-secondary">
                   <div className="h-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }} />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 text-right">Goal: ₹{savingsGoal.toFixed(0)}</p>
@@ -237,12 +206,11 @@ export const DashboardPage = () => {
             </Card>
           );
         })() : (
-          <Card className="glass relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Card className="glass relative overflow-hidden group border-t-4 border-t-emerald-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Money Saved</CardTitle>
-              <div className="bg-emerald-500/20 p-2 rounded-xl">
-                <Wallet className="h-4 w-4 text-emerald-500" />
+              <div className="bg-emerald-500 p-2 border border-foreground">
+                <Wallet className="h-4 w-4 text-white" />
               </div>
             </CardHeader>
             <CardContent>
@@ -258,12 +226,11 @@ export const DashboardPage = () => {
           const isGood = healthScore >= 60 && healthScore < 80;
           const scoreColor = isExcellent ? 'text-emerald-500' : isGood ? 'text-amber-500' : 'text-destructive';
           return (
-            <Card className="glass relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Card className="glass relative overflow-hidden group border-t-4 border-t-primary">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Budget Health</CardTitle>
-                <div className="bg-primary/20 p-2 rounded-xl">
-                  <HeartPulse className="h-4 w-4 text-primary" />
+                <div className="bg-primary p-2 border border-foreground">
+                  <HeartPulse className="h-4 w-4 text-primary-foreground" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -278,8 +245,8 @@ export const DashboardPage = () => {
           <Card className="glass">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Biggest Expense</CardTitle>
-              <div className="bg-destructive/20 p-2 rounded-xl">
-                <CreditCard className="h-4 w-4 text-destructive" />
+              <div className="bg-destructive p-2 border border-foreground">
+                <CreditCard className="h-4 w-4 text-white" />
               </div>
             </CardHeader>
             <CardContent>
@@ -303,7 +270,7 @@ export const DashboardPage = () => {
                 <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${value}`} />
                 <RechartsTooltip 
-                  contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#17181d', border: '1px solid #00e391', borderRadius: 0 }}
                 />
                 <Line 
                   type="monotone" 
@@ -332,7 +299,7 @@ export const DashboardPage = () => {
                     cy="50%"
                     innerRadius={60}
                     outerRadius={90}
-                    paddingAngle={5}
+                    paddingAngle={1}
                     dataKey="value"
                   >
                     {pieData.map((entry, index) => (
@@ -340,7 +307,7 @@ export const DashboardPage = () => {
                     ))}
                   </Pie>
                   <RechartsTooltip 
-                    contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                    contentStyle={{ backgroundColor: '#17181d', border: '1px solid #00e391', borderRadius: 0 }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -365,9 +332,9 @@ export const DashboardPage = () => {
               <p className="text-muted-foreground text-center py-4">No expenses recorded yet. Click Add Expense to start!</p>
             ) : (
               expenses.slice(0, 5).map((expense) => (
-                <div key={expense.id} className="flex items-center justify-between p-4 rounded-xl bg-background/30 hover:bg-background/50 transition-colors border border-white/5">
+                <div key={expense.id} className="flex items-center justify-between p-4 bg-secondary hover:bg-primary/10 transition-colors border border-border">
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-xl">
+                    <div className="h-10 w-10 bg-primary flex items-center justify-center text-xl border border-foreground">
                       💳
                     </div>
                     <div>

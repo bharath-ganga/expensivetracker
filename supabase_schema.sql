@@ -1,3 +1,7 @@
+-- LEGACY BOOTSTRAP FILE.
+-- For the current complete schema, apply:
+-- supabase/migrations/202608290001_finflow_foundation.sql
+-- This file remains only for reference for earlier installations.
 -- SpendSmart / FinFlow Complete Supabase Database Schema
 -- Execute these commands in your Supabase SQL Editor to set up the entire database from scratch!
 

@@ -16,6 +16,10 @@ interface AppState {
   
   incomes: Income[];
   setIncomes: (incomes: Income[]) => void;
+
+  financeLoading: boolean;
+  financeError: string | null;
+  setFinanceStatus: (loading: boolean, error?: string | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -33,4 +37,8 @@ export const useStore = create<AppState>((set) => ({
   
   incomes: [],
   setIncomes: (incomes) => set({ incomes }),
+
+  financeLoading: false,
+  financeError: null,
+  setFinanceStatus: (financeLoading, financeError = null) => set({ financeLoading, financeError }),
 }));

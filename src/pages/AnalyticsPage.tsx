@@ -2,18 +2,39 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { Brain, TrendingUp } from 'lucide-react';
 import { useStore } from '@/store/useStore';
+import { useMemo } from 'react';
+import { format, subMonths } from 'date-fns';
 
 export const AnalyticsPage = () => {
-  const { expenses } = useStore();
+  const { expenses, incomes } = useStore();
 
-  const barData = [
-    { name: 'Jan', income: 4000, expenses: 2400 },
-    { name: 'Feb', income: 3000, expenses: 1398 },
-    { name: 'Mar', income: 2000, expenses: 9800 },
-    { name: 'Apr', income: 2780, expenses: 3908 },
-    { name: 'May', income: 1890, expenses: 4800 },
-    { name: 'Jun', income: 2390, expenses: 3800 },
-  ];
+  const barData = useMemo(() => Array.from({ length: 6 }, (_, index) => {
+    const month = subMonths(new Date(), 5 - index);
+    const matchesMonth = (value: string) => {
+      const date = new Date(value);
+      return date.getMonth() === month.getMonth() && date.getFullYear() === month.getFullYear();
+    };
+    return {
+      name: format(month, 'MMM'),
+      income: incomes.filter(item => matchesMonth(item.date)).reduce((sum, item) => sum + item.amount, 0),
+      expenses: expenses.filter(item => matchesMonth(item.date)).reduce((sum, item) => sum + item.amount, 0),
+    };
+  }), [expenses, incomes]);
+
+  const topCategories = useMemo(() => {
+    const totals = expenses.reduce<Record<string, number>>((result, expense) => {
+      const category = expense.category_id || 'General';
+      result[category] = (result[category] || 0) + expense.amount;
+      return result;
+    }, {});
+    const total = Object.values(totals).reduce((sum, value) => sum + value, 0);
+    return Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, amount], index) => ({
+      name,
+      amount,
+      percent: total ? (amount / total) * 100 : 0,
+      color: ['bg-primary', 'bg-blue-500', 'bg-pink-500', 'bg-orange-500', 'bg-slate-500'][index],
+    }));
+  }, [expenses]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -26,14 +47,14 @@ export const AnalyticsPage = () => {
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* AI Insight Card */}
-        <Card className="glass md:col-span-3 bg-gradient-to-br from-primary/10 via-background to-accent/10 border-primary/20 relative overflow-hidden">
+        <Card className="glass relative overflow-hidden border-2 border-primary bg-primary text-primary-foreground md:col-span-3">
           <div className="absolute top-0 right-0 p-6 opacity-10">
             <Brain className="h-32 w-32" />
           </div>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-primary">
               <Brain className="h-6 w-6" />
-              AI Financial Insight
+              Financial Insight
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -80,19 +101,13 @@ export const AnalyticsPage = () => {
               <CardTitle>Top Categories</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {[
-                { name: 'Food', amount: 450, percent: 45, color: 'bg-primary' },
-                { name: 'Transport', amount: 200, percent: 20, color: 'bg-blue-500' },
-                { name: 'Shopping', amount: 150, percent: 15, color: 'bg-pink-500' },
-                { name: 'Bills', amount: 100, percent: 10, color: 'bg-orange-500' },
-                { name: 'Other', amount: 100, percent: 10, color: 'bg-muted' },
-              ].map((cat) => (
+              {topCategories.length === 0 ? <p className="text-sm text-muted-foreground">No category data yet.</p> : topCategories.map((cat) => (
                 <div key={cat.name} className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{cat.name}</span>
                     <span className="text-muted-foreground">₹{cat.amount}</span>
                   </div>
-                  <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                  <div className="h-2 w-full overflow-hidden border border-border bg-secondary">
                     <div className={`h-full ${cat.color}`} style={{ width: `${cat.percent}%` }} />
                   </div>
                 </div>
@@ -133,11 +148,11 @@ export const AnalyticsPage = () => {
 
                 return (
                   <div className="space-y-4">
-                    <div className="bg-background/50 p-3 rounded-lg border border-white/5">
+                    <div className="border border-border bg-background p-3">
                       <p className="text-xs text-muted-foreground mb-1">Your mood when spending most often:</p>
                       <p className="font-bold">{emojiMap[mostFrequent[0]]}</p>
                     </div>
-                    <div className="bg-background/50 p-3 rounded-lg border border-white/5">
+                    <div className="border border-border bg-background p-3">
                       <p className="text-xs text-muted-foreground mb-1">You spend the most (avg) when:</p>
                       <p className="font-bold text-red-400">{emojiMap[highestAvg[0]]} — avg ₹{(highestAvg[1] as any).total / (highestAvg[1] as any).count}/session</p>
                     </div>

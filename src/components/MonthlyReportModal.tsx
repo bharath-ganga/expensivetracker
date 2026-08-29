@@ -1,18 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useStore } from '@/store/useStore';
-import { Share2, Download, Trophy, Flame, Target } from 'lucide-react';
+import { Share2, Download, Trophy, Receipt, Target } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
 import { toast } from 'sonner';
 
 export const MonthlyReportModal = () => {
-  const { user, expenses } = useStore();
+  const { user, expenses, incomes } = useStore();
   const [isOpen, setIsOpen] = useState(false);
   
-  const reportRef = useRef<HTMLDivElement>(null);
-
   // We are calculating stats for the *previous* month
   const lastMonth = subMonths(new Date(), 1);
   const monthName = format(lastMonth, 'MMMM');
@@ -24,7 +22,11 @@ export const MonthlyReportModal = () => {
   });
 
   const totalSpent = lastMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalEarned = user?.monthly_salary || 0;
+  const recordedIncome = incomes.filter(item => {
+    const date = new Date(item.date);
+    return date.getMonth() === lastMonth.getMonth() && date.getFullYear() === lastMonth.getFullYear();
+  }).reduce((sum, item) => sum + item.amount, 0);
+  const totalEarned = recordedIncome || user?.monthly_salary || 0;
   const totalSaved = Math.max(0, totalEarned - totalSpent);
   const savedPercent = totalEarned > 0 ? (totalSaved / totalEarned) * 100 : 0;
 
@@ -35,79 +37,96 @@ export const MonthlyReportModal = () => {
   
   const biggestCategory = Object.entries(categories).sort((a: any, b: any) => b[1] - a[1])[0] || ['None', 0];
 
-  const budgetScore = Math.max(0, Math.min(100, 100 - ((totalSpent / totalEarned) * 100)));
+  const budgetScore = totalEarned > 0 ? Math.max(0, Math.min(100, 100 - ((totalSpent / totalEarned) * 100))) : 0;
 
-  const handleShare = () => {
-    // In a real app we'd use html2canvas to capture `reportRef.current` and share
-    toast.success('Report card image generated! (Simulation)');
+  const reportText = `${monthName} ${year} financial report\nEarned: ₹${totalEarned.toFixed(0)}\nSpent: ₹${totalSpent.toFixed(0)}\nSaved: ₹${totalSaved.toFixed(0)}\nBudget score: ${budgetScore.toFixed(0)}/100`;
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${monthName} financial report`, text: reportText });
+      } else {
+        await navigator.clipboard.writeText(reportText);
+        toast.success('Report copied to clipboard.');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      toast.error('Unable to share this report.');
+    }
+  };
+
+  const handleDownload = () => {
+    const escapeXml = (value: string) => value.replace(/[<>&'"]/g, character => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[character] || character);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080"><rect width="1080" height="1080" fill="#17181d"/><rect x="72" y="72" width="936" height="936" fill="#00e391"/><rect x="88" y="88" width="904" height="904" fill="#17181d"/><g fill="#f5f3ea" font-family="monospace"><text x="130" y="180" font-size="30">// FINFLOW_REPORT</text><text x="130" y="260" font-size="64" font-weight="700">${escapeXml(monthName.toUpperCase())} ${year}</text><text x="130" y="400" font-size="42">EARNED  ₹${totalEarned.toFixed(0)}</text><text x="130" y="500" font-size="42">SPENT   ₹${totalSpent.toFixed(0)}</text><text x="130" y="600" font-size="42">SAVED   ₹${totalSaved.toFixed(0)}</text><text x="130" y="740" font-size="52" fill="#00e391">SCORE ${budgetScore.toFixed(0)}/100</text><text x="130" y="890" font-size="28">TOP CATEGORY: ${escapeXml(String(biggestCategory[0]).toUpperCase())}</text></g></svg>`;
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `finflow-report-${year}-${format(lastMonth, 'MM')}.svg`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Report downloaded.');
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2 bg-primary/10 border-primary/20 text-primary hover:bg-primary/20">
+        <Button variant="outline" className="gap-2 border-2 border-primary bg-card text-primary hover:bg-primary hover:text-primary-foreground">
           <Trophy className="h-4 w-4" />
           View {monthName} Report Card
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-[450px] glass p-0 overflow-hidden border-white/10">
-        <div 
-          ref={reportRef}
-          className="bg-gradient-to-br from-slate-900 via-primary/20 to-slate-900 p-8 text-white relative"
-        >
-          {/* Decorative elements */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/30 rounded-full blur-3xl -mr-10 -mt-10" />
-          <div className="absolute bottom-0 left-0 w-32 h-32 bg-accent/30 rounded-full blur-3xl -ml-10 -mb-10" />
-
-          <div className="relative z-10 text-center mb-6">
-            <h2 className="text-3xl font-black mb-1">Your {monthName} Report 📊</h2>
-            <p className="text-white/70">SpendSmart Financial Summary</p>
+      <DialogContent className="glass overflow-hidden border-2 border-foreground p-0 sm:max-w-[450px]">
+        <div className="relative bg-foreground p-8 text-background">
+          <div className="relative z-10 mb-6 border-b-2 border-primary pb-5">
+            <p className="eyebrow mb-2 text-primary">// MONTHLY REPORT</p>
+            <h2 className="mb-1 text-3xl font-black uppercase tracking-tight">{monthName} {year}</h2>
+            <p className="font-mono text-xs uppercase tracking-widest text-background/70">SpendSmart financial summary</p>
           </div>
 
           <div className="relative z-10 space-y-3">
-            <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl backdrop-blur-sm border border-white/10">
-              <span className="text-white/80">💰 Total Spent</span>
+            <div className="flex items-center justify-between border border-background/40 bg-foreground p-3">
+              <span className="text-background/80">Total spent</span>
               <span className="font-bold text-xl text-red-400">₹{totalSpent.toFixed(0)}</span>
             </div>
             
-            <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl backdrop-blur-sm border border-white/10">
-              <span className="text-white/80">💵 Total Earned</span>
+            <div className="flex items-center justify-between border border-background/40 bg-foreground p-3">
+              <span className="text-background/80">Total earned</span>
               <span className="font-bold text-xl">₹{totalEarned.toFixed(0)}</span>
             </div>
 
-            <div className="flex justify-between items-center bg-emerald-500/20 p-3 rounded-xl backdrop-blur-sm border border-emerald-500/30">
-              <span className="text-emerald-100 flex items-center gap-2"><Trophy className="h-4 w-4 text-emerald-400" /> Total Saved</span>
+            <div className="flex items-center justify-between border-2 border-primary bg-primary p-3 text-primary-foreground">
+              <span className="flex items-center gap-2 font-bold"><Trophy className="h-4 w-4" /> Total saved</span>
               <div className="text-right">
-                <span className="font-bold text-xl text-emerald-400">₹{totalSaved.toFixed(0)}</span>
-                <span className="text-xs ml-2 text-emerald-200">({savedPercent.toFixed(0)}%)</span>
+                <span className="text-xl font-bold">₹{totalSaved.toFixed(0)}</span>
+                <span className="ml-2 text-xs">({savedPercent.toFixed(0)}%)</span>
               </div>
             </div>
 
-            <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl backdrop-blur-sm border border-white/10">
-              <span className="text-white/80">📉 Biggest Category</span>
+            <div className="flex items-center justify-between border border-background/40 bg-foreground p-3">
+              <span className="text-background/80">Biggest category</span>
               <div className="text-right">
                 <span className="font-bold">{biggestCategory[0]}</span>
-                <span className="text-xs ml-2 text-white/50">₹{Number(biggestCategory[1]).toFixed(0)}</span>
+                <span className="ml-2 text-xs text-background/50">₹{Number(biggestCategory[1]).toFixed(0)}</span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-primary/20 p-3 rounded-xl backdrop-blur-sm border border-primary/30 flex flex-col items-center justify-center text-center">
+              <div className="flex flex-col items-center justify-center border border-primary bg-foreground p-3 text-center">
                 <Target className="h-6 w-6 text-primary mb-1" />
-                <span className="text-xs text-white/80">Budget Score</span>
+                <span className="text-xs text-background/80">Budget score</span>
                 <span className="font-black text-2xl text-primary">{budgetScore.toFixed(0)}/100</span>
               </div>
-              <div className="bg-orange-500/20 p-3 rounded-xl backdrop-blur-sm border border-orange-500/30 flex flex-col items-center justify-center text-center">
-                <Flame className="h-6 w-6 text-orange-400 mb-1" />
-                <span className="text-xs text-white/80">Streak</span>
-                <span className="font-black text-2xl text-orange-400">3 Months</span>
+              <div className="flex flex-col items-center justify-center border border-background/40 bg-foreground p-3 text-center">
+                <Receipt className="mb-1 h-6 w-6 text-background" />
+                <span className="text-xs text-background/80">Transactions</span>
+                <span className="text-2xl font-black text-background">{lastMonthExpenses.length}</span>
               </div>
             </div>
 
-            <div className="mt-6 text-center bg-white/10 p-4 rounded-xl border border-white/20">
-              <p className="font-bold text-emerald-300 mb-1">Top Insight 🎉</p>
-              <p className="text-sm text-white/90">"You saved ₹3,000 MORE than last month! Keep it up!"</p>
+            <div className="mt-6 border border-background/40 bg-foreground p-4 text-center">
+              <p className="mb-1 font-mono text-xs font-bold uppercase tracking-widest text-primary">System insight</p>
+              <p className="text-sm text-background/90">{totalEarned === 0 ? 'Add income records to unlock a savings insight.' : savedPercent >= 20 ? `Savings rate is ${savedPercent.toFixed(0)}%. You are above the 20% benchmark.` : `Savings rate is ${savedPercent.toFixed(0)}%. Review the largest category for the fastest improvement.`}</p>
             </div>
           </div>
         </div>
@@ -116,7 +135,7 @@ export const MonthlyReportModal = () => {
           <Button className="flex-1 gap-2" onClick={handleShare}>
             <Share2 className="h-4 w-4" /> Share on Instagram
           </Button>
-          <Button variant="outline" size="icon" onClick={handleShare}>
+          <Button variant="outline" size="icon" onClick={handleDownload}>
             <Download className="h-4 w-4" />
           </Button>
         </div>

@@ -43,15 +43,14 @@ export const Sidebar = () => {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 w-64 hidden flex-col glass border-r border-white/10 dark:border-white/5 lg:flex">
-      <div className="flex h-20 items-center justify-center border-b border-white/10 dark:border-white/5 px-6">
+    <aside className="fixed inset-y-0 left-0 z-50 w-64 hidden flex-col border-r border-border bg-card lg:flex">
+      <div className="flex h-20 items-center border-b border-border px-5">
         <Link to="/" className="flex items-center gap-3 font-black tracking-wide text-2xl hover:opacity-90 transition-opacity">
-          <div className="relative flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/20 group">
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 blur-sm opacity-50 group-hover:opacity-100 transition-opacity" />
-            <Wallet className="relative h-5 w-5 text-white" />
+          <div className="flex items-center justify-center h-10 w-10 bg-primary border border-foreground">
+            <Wallet className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="font-extrabold tracking-tight text-foreground flex items-center">
-            Fin<span className="text-emerald-500 font-light">Flow</span>
+          <span className="font-mono font-bold tracking-[-0.06em] text-foreground flex items-center uppercase">
+            Fin<span className="text-primary">/Flow</span>
           </span>
         </Link>
       </div>
@@ -70,13 +69,13 @@ export const Sidebar = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                className={`flex items-center gap-3 border-l-4 px-4 py-3 font-mono text-xs font-bold uppercase tracking-wide transition-colors ${
                   isActive 
-                    ? 'bg-primary/15 text-primary shadow-[inset_0px_0px_20px_rgba(255,255,255,0.05)]' 
-                    : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                    ? 'bg-primary text-primary-foreground border border-foreground'
+                    : 'text-muted-foreground border border-transparent hover:border-border hover:bg-secondary hover:text-foreground'
                 }`}
               >
-                <Icon className={`h-5 w-5 ${isActive ? 'text-primary' : 'text-muted-foreground opacity-70'}`} />
+                <Icon className={`h-5 w-5 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground opacity-70'}`} />
                 {item.name}
               </Link>
             );
@@ -84,9 +83,9 @@ export const Sidebar = () => {
         </nav>
       </div>
 
-      <div className="mt-auto border-t border-white/10 dark:border-white/5 p-4">
-        <div className="flex items-center gap-3 px-2 py-3 mb-2 rounded-xl bg-secondary/30 border border-white/5">
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary/80 to-accent flex items-center justify-center text-white font-bold shadow-inner">
+      <div className="mt-auto border-t border-border p-4">
+        <div className="flex items-center gap-3 px-2 py-3 mb-2 bg-secondary border border-border">
+          <div className="h-10 w-10 bg-foreground text-background flex items-center justify-center font-mono font-bold">
             {user?.name?.charAt(0).toUpperCase() || 'U'}
           </div>
           <div className="flex flex-col overflow-hidden">
@@ -96,7 +95,7 @@ export const Sidebar = () => {
         </div>
         <button 
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-destructive/80 hover:text-destructive hover:bg-destructive/10 transition-colors"
+          className="flex w-full items-center gap-3 border-l-4 border-transparent px-4 py-3 font-mono text-xs font-bold uppercase tracking-wide text-destructive hover:border-destructive hover:bg-destructive hover:text-destructive-foreground"
         >
           <LogOut className="h-5 w-5" />
           Sign Out

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +8,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
 import { toast } from 'sonner';
-import { Plus, ExternalLink, ShoppingBag, CheckCircle2 } from 'lucide-react';
+import { Plus, ExternalLink, ShoppingBag, CheckCircle2, Edit3, Trash2 } from 'lucide-react';
+import type { WishlistItem } from '@/types/database';
 
 export const WishlistPage = () => {
-  const { user, expenses } = useStore();
-  const [wishlist, setWishlist] = useState<any[]>([]);
+  const { user, expenses, currency } = useStore();
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [editing, setEditing] = useState<WishlistItem | null>(null);
 
   const [formData, setFormData] = useState({
     item_name: '',
@@ -24,22 +26,22 @@ export const WishlistPage = () => {
     target_date: new Date().toISOString().split('T')[0],
   });
 
-  const fetchWishlist = async () => {
+  const fetchWishlist = useCallback(async () => {
     if (!user) return;
-    const { data } = await supabase.from('wishlist').select('*').eq('user_id', user.id);
-    if (data) setWishlist(data);
-  };
+    const { data, error } = await supabase.from('wishlist').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+    if (error) toast.error(error.message); else setWishlist((data || []) as WishlistItem[]);
+  }, [user]);
 
   useEffect(() => {
     fetchWishlist();
-  }, [user]);
+  }, [fetchWishlist]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     setIsLoading(true);
 
-    const { error } = await supabase.from('wishlist').insert([{
+    const payload = {
       user_id: user.id,
       item_name: formData.item_name,
       estimated_price: parseFloat(formData.estimated_price),
@@ -47,40 +49,40 @@ export const WishlistPage = () => {
       link: formData.link,
       target_date: formData.target_date,
       is_purchased: false,
-    }]);
+    };
+    const { error } = editing
+      ? await supabase.from('wishlist').update(payload).eq('id', editing.id).eq('user_id', user.id)
+      : await supabase.from('wishlist').insert(payload);
 
     if (error) toast.error('Failed to add to wishlist');
     else {
-      toast.success('Added to wishlist!');
+      toast.success(editing ? 'Wishlist item updated.' : 'Added to wishlist!');
       setIsOpen(false);
-      fetchWishlist();
+      setEditing(null);
+      void fetchWishlist();
     }
     setIsLoading(false);
   };
 
-  const handleBuy = async (item: any) => {
+  const handleBuy = async (item: WishlistItem) => {
     if (!user) return;
-    
-    // 1. Add to expenses
-    const { error: expError } = await supabase.from('expenses').insert([{
-      user_id: user.id,
-      amount: item.estimated_price,
-      description: item.item_name,
-      category_id: 'Shopping', // Default
-      date: new Date().toISOString().split('T')[0],
-      currency: 'INR'
-    }]);
-
-    if (expError) {
-      return toast.error('Failed to record expense');
-    }
-
-    // 2. Mark as purchased
-    const { error } = await supabase.from('wishlist').update({ is_purchased: true }).eq('id', item.id);
+    const { error } = await supabase.rpc('purchase_wishlist_item', { p_item_id: item.id, p_currency: currency });
     if (!error) {
       toast.success('Marked as purchased & added to expenses!');
-      fetchWishlist();
-    }
+      void fetchWishlist();
+    } else toast.error(error.message);
+  };
+
+  const openEdit = (item: WishlistItem) => {
+    setEditing(item);
+    setFormData({ item_name: item.item_name, estimated_price: String(item.estimated_price), priority: item.priority, link: item.link || '', target_date: item.target_date || new Date().toISOString().split('T')[0] });
+    setIsOpen(true);
+  };
+
+  const deleteItem = async (item: WishlistItem) => {
+    if (!window.confirm(`Delete “${item.item_name}”?`)) return;
+    const { error } = await supabase.from('wishlist').delete().eq('id', item.id).eq('user_id', user?.id);
+    if (error) toast.error(error.message); else void fetchWishlist();
   };
 
   const unpurchased = wishlist.filter(w => !w.is_purchased);
@@ -104,27 +106,27 @@ export const WishlistPage = () => {
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-primary text-primary-foreground">
+            <Button className="gap-2 bg-primary text-primary-foreground" onClick={() => { setEditing(null); setFormData({ item_name: '', estimated_price: '', priority: 'Medium', link: '', target_date: new Date().toISOString().split('T')[0] }); }}>
               <Plus className="h-4 w-4" /> Add Item
             </Button>
           </DialogTrigger>
           <DialogContent className="glass">
             <DialogHeader>
-              <DialogTitle>New Wishlist Item</DialogTitle>
+              <DialogTitle>{editing ? 'Edit Wishlist Item' : 'New Wishlist Item'}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Item Name</Label>
-                <Input required className="bg-background/50" value={formData.item_name} onChange={e => setFormData({...formData, item_name: e.target.value})} />
+                <Input required className="border-2 border-input bg-background" value={formData.item_name} onChange={e => setFormData({...formData, item_name: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Estimated Price (₹)</Label>
-                <Input type="number" required className="bg-background/50" value={formData.estimated_price} onChange={e => setFormData({...formData, estimated_price: e.target.value})} />
+                <Input type="number" required className="border-2 border-input bg-background" value={formData.estimated_price} onChange={e => setFormData({...formData, estimated_price: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label>Priority</Label>
                 <Select value={formData.priority} onValueChange={v => setFormData({...formData, priority: v})}>
-                  <SelectTrigger className="bg-background/50">
+                  <SelectTrigger className="border-2 border-input bg-background">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="glass">
@@ -136,26 +138,27 @@ export const WishlistPage = () => {
               </div>
               <div className="space-y-2">
                 <Label>Product Link (Optional)</Label>
-                <Input type="url" className="bg-background/50" value={formData.link} onChange={e => setFormData({...formData, link: e.target.value})} placeholder="https://..." />
+                <Input type="url" className="border-2 border-input bg-background" value={formData.link} onChange={e => setFormData({...formData, link: e.target.value})} placeholder="https://..." />
               </div>
               <div className="space-y-2">
                 <Label>Target Buy Date</Label>
-                <Input type="date" required className="bg-background/50" value={formData.target_date} onChange={e => setFormData({...formData, target_date: e.target.value})} />
+                <Input type="date" required className="border-2 border-input bg-background" value={formData.target_date} onChange={e => setFormData({...formData, target_date: e.target.value})} />
               </div>
-              <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Saving...' : 'Add to Wishlist'}</Button>
+              <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Saving...' : (editing ? 'Update Item' : 'Add to Wishlist')}</Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="bg-primary/10 border border-primary/20 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="flex flex-col items-center justify-between gap-4 border-2 border-foreground bg-primary p-6 text-primary-foreground shadow-[5px_5px_0_hsl(var(--foreground))] md:flex-row">
         <div>
-          <h3 className="text-xl font-bold">Total needed: <span className="text-primary">₹{totalNeeded.toFixed(2)}</span></h3>
-          <p className="text-muted-foreground">At your current savings rate, you can afford everything in ~<span className="font-bold text-foreground">{monthsToAfford} months</span>.</p>
+          <p className="eyebrow mb-2">// PURCHASE QUEUE</p>
+          <h3 className="text-xl font-bold">Total needed: ₹{totalNeeded.toFixed(2)}</h3>
+          <p>At your current savings rate, you can afford everything in ~<span className="font-bold">{monthsToAfford} months</span>.</p>
         </div>
-        <div className="bg-background/50 px-4 py-2 rounded-lg border border-white/5">
-          <p className="text-sm text-muted-foreground">Current Savings</p>
-          <p className="text-lg font-bold">₹{currentSavings.toFixed(2)}</p>
+        <div className="border-2 border-primary-foreground bg-foreground px-5 py-3 text-background">
+          <p className="font-mono text-xs uppercase tracking-widest">Current savings</p>
+          <p className="text-xl font-black text-primary">₹{currentSavings.toFixed(2)}</p>
         </div>
       </div>
 
@@ -176,14 +179,15 @@ export const WishlistPage = () => {
             <CardContent className="flex-1">
               <p className="text-3xl font-bold text-primary mb-2">₹{item.estimated_price}</p>
               <div className="flex gap-2 text-sm text-muted-foreground">
-                <span className="bg-background/50 px-2 py-1 rounded border border-white/5">{item.priority} Priority</span>
-                <span className="bg-background/50 px-2 py-1 rounded border border-white/5">Target: {new Date(item.target_date).toLocaleDateString()}</span>
+                <span className="border border-border bg-background px-2 py-1 font-mono text-xs uppercase">{item.priority} priority</span>
+                <span className="border border-border bg-background px-2 py-1 font-mono text-xs uppercase">Target: {new Date(item.target_date).toLocaleDateString()}</span>
               </div>
             </CardContent>
-            <CardFooter className="bg-black/20 pt-4 border-t border-white/5">
-              <Button onClick={() => handleBuy(item)} className="w-full gap-2" variant="outline">
+            <CardFooter className="gap-2 border-t-2 border-border bg-secondary pt-4">
+              <Button onClick={() => handleBuy(item)} className="flex-1 gap-2" variant="outline">
                 <ShoppingBag className="h-4 w-4" /> I Bought This!
               </Button>
+              <Button variant="ghost" size="icon" onClick={() => openEdit(item)}><Edit3 /></Button><Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteItem(item)}><Trash2 /></Button>
             </CardFooter>
           </Card>
         ))}
@@ -200,9 +204,9 @@ export const WishlistPage = () => {
           <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><CheckCircle2 className="text-emerald-500" /> Already Purchased</h3>
           <div className="space-y-2">
             {wishlist.filter(w => w.is_purchased).map(item => (
-              <div key={item.id} className="p-4 bg-background/30 rounded-xl border border-white/5 flex justify-between items-center opacity-60">
+              <div key={item.id} className="flex items-center justify-between border border-border bg-secondary p-4 opacity-60">
                 <span className="line-through">{item.item_name}</span>
-                <span>₹{item.estimated_price}</span>
+                <div className="flex items-center gap-3"><span>₹{item.estimated_price}</span><Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteItem(item)}><Trash2 /></Button></div>
               </div>
             ))}
           </div>

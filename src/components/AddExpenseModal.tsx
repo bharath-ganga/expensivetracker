@@ -9,8 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Check, ChevronsUpDown, Plus, Receipt, IndianRupee, Camera, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store/useStore';
+import { financeRepository } from '@/lib/finance-repository';
 
 const moods = [
   { label: 'Happy', emoji: '😊', value: 'happy' },
@@ -33,7 +33,8 @@ export const AddExpenseModal = () => {
     category: 'Food & Dining',
     date: new Date().toISOString().split('T')[0],
     notes: '',
-    mood: 'neutral'
+    mood: 'neutral',
+    receipt_url: ''
   });
 
   const [openCategory, setOpenCategory] = useState(false);
@@ -51,21 +52,17 @@ export const AddExpenseModal = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!user) return;
     setIsScanning(true);
-    toast.info("Analyzing receipt with AI...");
-    
-    // Simulate API Call to Claude AI Vision
-    setTimeout(() => {
-      setFormData(prev => ({
-        ...prev,
-        amount: '1250',
-        description: 'Starbucks Coffee',
-        category: 'Food & Dining',
-        date: new Date().toISOString().split('T')[0]
-      }));
-      toast.success("Receipt scanned successfully!");
+    try {
+      const receiptPath = await financeRepository.uploadReceipt(user.id, file);
+      setFormData(prev => ({ ...prev, receipt_url: receiptPath }));
+      toast.success('Receipt attached. Enter the transaction details to continue.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to upload receipt.');
+    } finally {
       setIsScanning(false);
-    }, 2500);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,35 +71,19 @@ export const AddExpenseModal = () => {
     
     setIsLoading(true);
     
-    const insertData: any = {
-      user_id: user.id,
+    try {
+      await financeRepository.createExpense(user.id, {
       amount: parseFloat(formData.amount),
       description: formData.description,
       date: formData.date,
       currency: 'INR',
-      category_id: formData.category
-    };
-
-    // Try inserting with mood and notes if they exist in the schema
-    let result = await supabase.from('expenses').insert([{
-      ...insertData,
+      category_id: formData.category,
       notes: formData.notes,
-      mood: formData.mood
-    }]);
-
-    let error = result.error;
-
-    // Graceful fallback if mood or notes columns do not exist in the database table
-    if (error && error.message && (error.message.includes('column') || error.message.includes('mood') || error.message.includes('notes') || error.code === 'PGRST204')) {
-      console.warn('Retrying insert without mood and notes due to database schema mismatch:', error);
-      const retryResult = await supabase.from('expenses').insert([insertData]);
-      error = retryResult.error;
-    }
-
-    if (error) {
-      toast.error(error.message || 'Failed to add expense');
-      console.error(error);
-    } else {
+      mood: formData.mood as 'happy' | 'neutral' | 'guilty' | 'excited' | 'stressed',
+      receipt_url: formData.receipt_url || null,
+      is_recurring: false,
+      tags: [],
+      });
       toast.success('Expense added successfully!');
       setIsOpen(false);
       setFormData({
@@ -111,8 +92,11 @@ export const AddExpenseModal = () => {
         category: 'Food & Dining',
         date: new Date().toISOString().split('T')[0],
         notes: '',
-        mood: 'neutral'
+        mood: 'neutral',
+        receipt_url: ''
       });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add expense');
     }
     
     setIsLoading(false);
@@ -121,13 +105,13 @@ export const AddExpenseModal = () => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 rounded-xl h-12 flex items-center justify-center gap-2 transition-all hover:scale-[1.02]">
+        <Button className="h-12 w-full gap-2 border-2 border-foreground bg-primary text-primary-foreground shadow-[3px_3px_0_hsl(var(--foreground))] hover:bg-primary/90">
           <Plus className="h-5 w-5" />
           <span className="font-semibold">Add Expense</span>
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-[425px] glass border-white/10 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="glass max-h-[90vh] overflow-y-auto border-2 border-foreground sm:max-w-[425px]">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
@@ -137,12 +121,12 @@ export const AddExpenseModal = () => {
             <Button 
               variant="outline" 
               size="sm" 
-              className="gap-2 bg-primary/10 border-primary/20 text-primary hover:bg-primary/20"
+              className="gap-2 border-2 border-primary bg-card text-primary hover:bg-primary hover:text-primary-foreground"
               onClick={() => fileInputRef.current?.click()}
               disabled={isScanning}
             >
               {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-              {isScanning ? "Scanning..." : "Scan Receipt"}
+              {isScanning ? "Uploading..." : (formData.receipt_url ? "Receipt Attached" : "Attach Receipt")}
             </Button>
             <input 
               type="file" 
@@ -163,7 +147,7 @@ export const AddExpenseModal = () => {
                 type="number"
                 step="0.01"
                 placeholder="0.00"
-                className="pl-10 text-lg font-semibold bg-background/50 border-white/10"
+                className="border-2 border-input bg-background pl-10 text-lg font-semibold"
                 value={formData.amount}
                 onChange={(e) => setFormData({...formData, amount: e.target.value})}
                 required
@@ -175,7 +159,7 @@ export const AddExpenseModal = () => {
             <Label>Description</Label>
             <Input
               placeholder="What did you buy?"
-              className="bg-background/50 border-white/10"
+              className="border-2 border-input bg-background"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               required
@@ -191,7 +175,7 @@ export const AddExpenseModal = () => {
                     variant="outline"
                     role="combobox"
                     aria-expanded={openCategory}
-                    className="w-full justify-between bg-background/50 border-white/10 font-normal px-3"
+                    className="w-full justify-between border-2 border-input bg-background px-3 font-normal"
                   >
                     {formData.category
                       ? (
@@ -204,7 +188,7 @@ export const AddExpenseModal = () => {
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[200px] p-0 glass border-white/10 z-[100]" align="start">
+                <PopoverContent className="glass z-[100] w-[200px] border-2 border-foreground p-0" align="start">
                   <Command>
                     <CommandInput placeholder="Search category..." />
                     <CommandList>
@@ -242,7 +226,7 @@ export const AddExpenseModal = () => {
               <Label>Date</Label>
               <Input
                 type="date"
-                className="bg-background/50 border-white/10"
+                className="border-2 border-input bg-background"
                 value={formData.date}
                 onChange={(e) => setFormData({...formData, date: e.target.value})}
                 required
@@ -254,7 +238,7 @@ export const AddExpenseModal = () => {
             <Label>Notes (Optional)</Label>
             <Textarea
               placeholder="Any details about this expense?"
-              className="bg-background/50 border-white/10 resize-none h-20"
+              className="h-20 resize-none border-2 border-input bg-background"
               value={formData.notes}
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
             />
@@ -268,7 +252,7 @@ export const AddExpenseModal = () => {
                   key={m.value}
                   type="button"
                   onClick={() => setFormData({ ...formData, mood: m.value })}
-                  className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all flex-1 ${formData.mood === m.value ? 'bg-primary/20 border border-primary/50 scale-105' : 'bg-background/50 border border-transparent opacity-60 hover:opacity-100'}`}
+                  className={`flex flex-1 flex-col items-center justify-center border-2 p-2 transition-colors ${formData.mood === m.value ? 'border-foreground bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
                 >
                   <span className="text-2xl">{m.emoji}</span>
                   <span className="text-[10px] mt-1">{m.label}</span>
@@ -279,7 +263,7 @@ export const AddExpenseModal = () => {
 
           <Button 
             type="submit" 
-            className="w-full mt-6 bg-gradient-to-r from-primary to-accent hover:opacity-90 h-11"
+            className="mt-6 h-11 w-full border-2 border-foreground bg-primary text-primary-foreground shadow-[3px_3px_0_hsl(var(--foreground))] hover:bg-primary/90"
             disabled={isLoading || isScanning}
           >
             {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Save Expense'}

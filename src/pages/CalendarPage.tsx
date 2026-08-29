@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { useStore } from '@/store/useStore';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Receipt, X } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
+import type { Expense, Income } from '@/types/database';
+
+type CalendarItem = (Expense & { kind: 'expense' }) | (Income & { kind: 'income' });
 
 export const CalendarPage = () => {
-  const { expenses } = useStore();
+  const { expenses, incomes } = useStore();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -17,18 +20,25 @@ export const CalendarPage = () => {
   }, [currentMonth]);
 
   const expensesByDate = useMemo(() => {
-    const map = new Map<string, { total: number, items: any[] }>();
+    const map = new Map<string, { spent: number, earned: number, items: CalendarItem[] }>();
     expenses.forEach(expense => {
       const dateStr = expense.date.split('T')[0];
       if (!map.has(dateStr)) {
-        map.set(dateStr, { total: 0, items: [] });
+        map.set(dateStr, { spent: 0, earned: 0, items: [] });
       }
       const dayData = map.get(dateStr)!;
-      dayData.total += expense.amount;
-      dayData.items.push(expense);
+      dayData.spent += expense.amount;
+      dayData.items.push({ ...expense, kind: 'expense' });
+    });
+    incomes.forEach(income => {
+      const dateStr = income.date.split('T')[0];
+      if (!map.has(dateStr)) map.set(dateStr, { spent: 0, earned: 0, items: [] });
+      const dayData = map.get(dateStr)!;
+      dayData.earned += income.amount;
+      dayData.items.push({ ...income, kind: 'income' });
     });
     return map;
-  }, [expenses]);
+  }, [expenses, incomes]);
 
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
@@ -54,13 +64,13 @@ export const CalendarPage = () => {
               {format(currentMonth, 'MMMM yyyy')}
             </CardTitle>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={prevMonth} className="bg-background/50 border-white/10">
+              <Button variant="outline" size="icon" onClick={prevMonth} className="border-2 border-border bg-background">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="bg-background/50 border-white/10">
+              <Button variant="outline" onClick={() => setCurrentMonth(new Date())} className="border-2 border-border bg-background">
                 Today
               </Button>
-              <Button variant="outline" size="icon" onClick={nextMonth} className="bg-background/50 border-white/10">
+              <Button variant="outline" size="icon" onClick={nextMonth} className="border-2 border-border bg-background">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -75,17 +85,17 @@ export const CalendarPage = () => {
             </div>
             <div className="grid grid-cols-7 gap-1 md:gap-2">
               {blanks.map(blank => (
-                <div key={`blank-${blank}`} className="h-20 md:h-24 bg-secondary/20 rounded-xl border border-white/5 opacity-50" />
+                <div key={`blank-${blank}`} className="h-20 border border-border bg-secondary md:h-24" />
               ))}
               {daysInMonth.map(date => {
                 const dateStr = format(date, 'yyyy-MM-dd');
-                const dayData = expensesByDate.get(dateStr) || { total: 0, items: [] };
+                const dayData = expensesByDate.get(dateStr) || { spent: 0, earned: 0, items: [] };
                 
                 // Color coding
                 let colorClass = 'bg-secondary/30 hover:bg-secondary/50';
-                if (dayData.total > 0) {
-                  if (dayData.total > 2000) colorClass = 'bg-red-500/20 border-red-500/30 hover:bg-red-500/30';
-                  else if (dayData.total > 500) colorClass = 'bg-yellow-500/20 border-yellow-500/30 hover:bg-yellow-500/30';
+                if (dayData.spent > 0) {
+                  if (dayData.spent > 2000) colorClass = 'bg-red-500/20 border-red-500/30 hover:bg-red-500/30';
+                  else if (dayData.spent > 500) colorClass = 'bg-yellow-500/20 border-yellow-500/30 hover:bg-yellow-500/30';
                   else colorClass = 'bg-emerald-500/20 border-emerald-500/30 hover:bg-emerald-500/30';
                 }
 
@@ -96,7 +106,7 @@ export const CalendarPage = () => {
                   <button
                     key={date.toString()}
                     onClick={() => setSelectedDate(date)}
-                    className={`h-20 md:h-24 p-2 rounded-xl border border-white/5 transition-all text-left flex flex-col relative
+                    className={`relative flex h-20 flex-col border border-border p-2 text-left transition-colors md:h-24
                       ${colorClass} 
                       ${isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
                       ${isCurrentToday ? 'border-primary/50' : ''}
@@ -105,11 +115,10 @@ export const CalendarPage = () => {
                     <span className={`text-sm font-semibold ${isCurrentToday ? 'text-primary' : 'text-foreground'}`}>
                       {format(date, 'd')}
                     </span>
-                    {dayData.total > 0 && (
-                      <div className="mt-auto">
-                        <span className="text-xs font-bold text-foreground">
-                          ₹{dayData.total.toFixed(0)}
-                        </span>
+                    {(dayData.spent > 0 || dayData.earned > 0) && (
+                      <div className="mt-auto flex flex-col font-mono text-[10px] font-bold">
+                        {dayData.earned > 0 && <span className="text-primary">+₹{dayData.earned.toFixed(0)}</span>}
+                        {dayData.spent > 0 && <span className="text-destructive">-₹{dayData.spent.toFixed(0)}</span>}
                       </div>
                     )}
                   </button>
@@ -122,7 +131,7 @@ export const CalendarPage = () => {
         {selectedDate && (
           <div className="w-80 hidden lg:block animate-in slide-in-from-right-4">
             <Card className="glass h-full">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-white/5">
+              <CardHeader className="flex flex-row items-center justify-between border-b-2 border-border pb-2">
                 <CardTitle className="text-lg">
                   {format(selectedDate, 'MMM d, yyyy')}
                 </CardTitle>
@@ -145,19 +154,19 @@ export const CalendarPage = () => {
 
                   return (
                     <>
-                      <div className="flex justify-between items-center bg-primary/10 p-3 rounded-lg border border-primary/20">
-                        <span className="font-semibold text-primary">Total Spent</span>
-                        <span className="font-bold text-lg text-primary">₹{dayData.total.toFixed(2)}</span>
+                      <div className="grid grid-cols-2 border border-border">
+                        <div className="p-3 bg-destructive text-white"><p className="text-xs uppercase">Spent</p><p className="font-bold">₹{dayData.spent.toFixed(2)}</p></div>
+                        <div className="p-3 bg-primary text-primary-foreground"><p className="text-xs uppercase">Earned</p><p className="font-bold">₹{dayData.earned.toFixed(2)}</p></div>
                       </div>
                       <div className="space-y-3 mt-4">
                         {dayData.items.map(expense => (
-                          <div key={expense.id} className="bg-background/50 p-3 rounded-lg border border-white/5">
+                          <div key={expense.id} className="border border-border bg-background p-3">
                             <div className="flex justify-between items-start">
                               <div>
-                                <p className="font-semibold text-sm">{expense.description}</p>
-                                <p className="text-xs text-muted-foreground">{expense.category}</p>
+                                <p className="font-semibold text-sm">{expense.kind === 'expense' ? expense.description : expense.source}</p>
+                                <p className="text-xs text-muted-foreground">{expense.category_id || 'General'}</p>
                               </div>
-                              <span className="font-bold text-sm">-₹{expense.amount.toFixed(2)}</span>
+                              <span className={`font-bold text-sm ${expense.kind === 'income' ? 'text-primary' : 'text-destructive'}`}>{expense.kind === 'income' ? '+' : '-'}₹{expense.amount.toFixed(2)}</span>
                             </div>
                             {expense.notes && <p className="text-xs text-muted-foreground mt-2 italic">"{expense.notes}"</p>}
                           </div>
